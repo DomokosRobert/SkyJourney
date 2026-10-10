@@ -2,6 +2,7 @@ using Serilog;
 using SkyJourney.Api.Common;
 using SkyJourney.Application;
 using SkyJourney.Infrastructure;
+using SkyJourney.Infrastructure.Persistence;
 
 Log.Logger = new LoggerConfiguration().WriteTo.Console().CreateBootstrapLogger();
 
@@ -20,6 +21,8 @@ try
         .AddApiServices();
 
     var app = builder.Build();
+
+    await DatabaseInitializer.InitializeAsync(app.Services, app.Configuration);
 
     app.UseExceptionHandler();
     app.UseStatusCodePages();

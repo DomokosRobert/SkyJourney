@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using SkyJourney.Application.Common;
 using SkyJourney.Infrastructure.Persistence;
 
 namespace SkyJourney.Infrastructure;
@@ -18,6 +19,7 @@ public static class DependencyInjection
             .UseNpgsql(connectionString, npgsql => npgsql.MigrationsHistoryTable("__ef_migrations_history"))
             .UseSnakeCaseNamingConvention());
 
+        services.AddScoped<ISkyJourneyDbContext>(sp => sp.GetRequiredService<SkyJourneyDbContext>());
         services.AddSingleton(TimeProvider.System);
         return services;
     }
