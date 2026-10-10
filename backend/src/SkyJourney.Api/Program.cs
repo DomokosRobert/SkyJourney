@@ -25,14 +25,17 @@ try
 
     await DatabaseInitializer.InitializeAsync(app.Services, app.Configuration);
 
-    app.UseExceptionHandler();
-    app.UseStatusCodePages();
+    // Correlation and request logging wrap the exception handler, so every log line (including the
+    // handler's) carries the correlation id and the request log records the final status code.
     app.UseMiddleware<CorrelationIdMiddleware>();
     app.UseSerilogRequestLogging(options =>
     {
         // Only method, path, status and timing are logged: never bodies, query strings or headers.
         options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0} ms";
+        options.GetLevel = RequestLogLevel.For;
     });
+    app.UseExceptionHandler();
+    app.UseStatusCodePages();
 
     if (app.Configuration.GetValue<bool>("OpenApi:Enabled"))
     {

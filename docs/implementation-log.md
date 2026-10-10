@@ -95,3 +95,14 @@ is filled in by the next commit (or listed in the final report).
   - Removed template files that do not belong to this project: the template's `.claude/` settings (enabled a third-party
     plugin), `LICENSE`, `App.tsx`, `index.ts`. Kept the template `AGENTS.md` (Expo-specific agent guidance).
   - TypeScript 6 no longer auto-includes all `@types`, so `tsconfig.json` lists `"types": ["jest"]`.
+
+## Fix — `fix(api): log request outcome after exception handling`
+- **Found during** M8 simulator testing: when Expo Go was terminated mid-request, the request log recorded `500 ERR` with an
+  `OperationCanceledException` stack, because Serilog request logging ran *inside* the exception handler and so never saw the
+  final status. The handler's own log lines also lacked the correlation id.
+- **Content:** correlation-id middleware and request logging now wrap `UseExceptionHandler`; `RequestLogLevel` logs client
+  disconnects (499) at Debug, 5xx/exceptions at Error and everything else at Information; integration tests for correlation-id
+  echo (generated, preserved, unsafe value replaced, present in Problem Details body) and the level mapping.
+- **Validation:** ✅ `dotnet build` (0 warnings); ✅ `dotnet test` 106/106. Manually: request log lines carry the caller's
+  correlation id and record final status codes. A real mid-request client abort could not be reproduced locally (responses take
+  ~1 ms); the 499 path is covered by the level-mapping test only.

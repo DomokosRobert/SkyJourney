@@ -28,7 +28,6 @@ public sealed class GlobalExceptionHandler(
             DbUpdateConcurrencyException => Problem(StatusCodes.Status409Conflict, "Conflict",
                 "The resource was modified by another request. Reload it and try again.", "concurrency_conflict"),
             BadHttpRequestException badRequest => Problem(StatusCodes.Status400BadRequest, "Bad request", badRequest.Message, "bad_request"),
-            OperationCanceledException when httpContext.RequestAborted.IsCancellationRequested => null,
             _ => null,
         };
 
@@ -37,7 +36,7 @@ public sealed class GlobalExceptionHandler(
             if (exception is OperationCanceledException && httpContext.RequestAborted.IsCancellationRequested)
             {
                 // Client went away; nothing to respond to.
-                httpContext.Response.StatusCode = 499;
+                httpContext.Response.StatusCode = RequestLogLevel.ClientClosedRequest;
                 return true;
             }
 
