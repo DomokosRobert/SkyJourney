@@ -1,0 +1,112 @@
+# Continuous integration: the same checks every milestone was committed with (see docs/testing.md).
+# Nothing is published or deployed from here; the Docker job only proves the images build.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
+
+jobs:
+  backend:
+    name: Backend (build, format, tests)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          # Latest .NET 10 SDK; global.json allows newer feature bands (rollForward: latestFeature).
+          dotnet-version: "10.0.x"
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('backend/Directory.Packages.props', 'backend/**/*.csproj', 'backend/dotnet-tools.json') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: |
+          dotnet restore
+          dotnet tool restore
+
+      - name: Build (warnings are errors)
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Verify formatting
+        run: dotnet format --verify-no-changes --no-restore
+
+      - name: Verify the EF Core model matches the migrations
+        run: >-
+          dotnet ef migrations has-pending-model-changes
+          --project src/SkyJourney.Infrastructure --startup-project src/SkyJourney.Infrastructure
+          --configuration Release --no-build
+
+      # Integration tests start PostgreSQL with Testcontainers, using the runner's Docker engine.
+      - name: Test (unit, integration, concurrency)
+        run: dotnet test --no-build --configuration Release
+
+  docker:
+    name: Docker images
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    needs: backend
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build API image
+        run: docker build --tag skyjourney-api:ci backend
+
+      - name: Build migration bundle image
+        run: docker build --target migrations --tag skyjourney-migrations:ci backend
+
+  mobile:
+    name: Mobile (types, lint, tests, bundle)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: mobile/SkyJourney.Mobile
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/SkyJourney.Mobile/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit and component tests
+        run: npm run test:ci
+
+      - name: Expo Doctor
+        run: npx expo-doctor
+
+      - name: Bundle for iOS and Android
+        run: npx expo export --platform ios --platform android --output-dir dist

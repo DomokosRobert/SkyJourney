@@ -84,3 +84,17 @@ export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock
 ```
 
 Docker Desktop and Linux CI runners don't need this.
+
+## Continuous integration
+`.github/workflows/ci.yml` runs on every push to `main`, on every pull request, and on demand. It has three jobs, which
+use the same commands as local development:
+
+| Job | Steps |
+|-----|-------|
+| Backend | restore, Release build (warnings are errors), `dotnet format --verify-no-changes`, `has-pending-model-changes`, `dotnet test` (Testcontainers on the runner's Docker) |
+| Docker | builds the API image and the migration-bundle image, after the backend job passes; nothing is pushed |
+| Mobile | `npm ci`, typecheck, lint, `jest --ci`, `expo-doctor`, `expo export` for iOS and Android |
+
+The workflow's token is read-only (`contents: read`), and newer runs cancel older ones on the same branch.
+Dependabot (`.github/dependabot.yml`) proposes NuGet, Actions and Docker base-image updates every week. It leaves npm
+out, because Expo packages are upgraded together with `npx expo install --fix`.

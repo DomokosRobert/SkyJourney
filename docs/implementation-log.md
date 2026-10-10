@@ -368,3 +368,25 @@ is filled in by the next commit (or listed in the final report).
     ASP.NET Core shared framework through Identity. With `runtime` it exited with code 150.
   - Compose falls back to a clearly named local-only signing key, so the stack starts without a `.env`. Real
     environments must set `Jwt__SigningKey`; Production refuses to start without one.
+
+## M17 — `ci: add GitHub Actions workflow`
+- **Previous commit:** M16 = `cfec75a`.
+- **What it adds:**
+  - **`.github/workflows/ci.yml`:** backend (Release build, format, pending-model check, all tests), Docker (both image
+    targets) and mobile (`npm ci`, typecheck, lint, Jest, expo-doctor, iOS and Android export). The token is read-only
+    and older runs on the same branch are cancelled.
+  - **`.github/dependabot.yml`:** weekly updates for NuGet, Actions and Docker. npm is excluded because Expo packages
+    must be upgraded together.
+- **Validation:**
+  - ✅ `actionlint` 1.7.7 (official Docker image, with shellcheck): 0 errors in both files.
+  - ✅ Every workflow command was run locally exactly as written:
+    - Release build with 0 warnings; format; no pending model changes; `dotnet test --no-build -c Release` 206/206.
+    - `docker build` of both targets (M16).
+    - typecheck, lint, `test:ci` 109/109, expo-doctor 21/21, and `expo export` for iOS and Android.
+  - ⚠️ Not run: the workflow itself has never run on GitHub, because nothing has been pushed (that needs the owner's
+    permission). For the same reason there is no CI badge in the README. Add one only after a green run.
+- **Decisions:**
+  - CI uses the latest .NET 10 SDK (`10.0.x`) rather than pinning the exact patch. `global.json` allows newer feature
+    bands, and the newer patch matches the 10.0.x package versions.
+  - Docker images are built, never pushed. Publishing to a registry needs credentials and a decision from the owner
+    (see `docs/deployment.md`).

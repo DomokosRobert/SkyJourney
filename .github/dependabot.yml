@@ -1,0 +1,21 @@
+# Weekly dependency update PRs. npm is deliberately not listed: Expo SDK packages must move together
+# (npx expo install --fix / an SDK upgrade), which per-package PRs would break.
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: /backend
+    schedule:
+      interval: weekly
+    groups:
+      dotnet:
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /backend
+    schedule:
+      interval: weekly
