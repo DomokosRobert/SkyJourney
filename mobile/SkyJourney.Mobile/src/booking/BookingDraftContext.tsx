@@ -2,6 +2,7 @@ import { createContext, useContext, useMemo, useState, type ReactNode } from 're
 
 import type { FareOffer, FlightOffer } from '@/api/types';
 import { initialCriteria, type SearchCriteria } from '@/search/criteria';
+import { createIdempotencyKeys, type IdempotencyKeys } from './idempotency';
 
 export type Leg = 'outbound' | 'return';
 
@@ -19,6 +20,11 @@ type DraftContextValue = Draft & {
   /** Selecting an outbound fare clears any return selection, which may no longer be valid. */
   selectFare: (leg: Leg, selection: FareSelection) => void;
   clearSelection: () => void;
+  /**
+   * Idempotency keys for creating the booking. They live as long as the app session, so going back and pressing
+   * "Continue" again with the same flights and passengers returns the booking already created instead of a second one.
+   */
+  createBookingKeys: IdempotencyKeys;
 };
 
 const DraftContext = createContext<DraftContextValue | null>(null);
@@ -29,6 +35,7 @@ const DraftContext = createContext<DraftContextValue | null>(null);
  */
 export function BookingDraftProvider({ children }: { children: ReactNode }) {
   const [draft, setDraft] = useState<Draft>({ criteria: initialCriteria, outbound: null, inbound: null });
+  const [createBookingKeys] = useState(() => createIdempotencyKeys());
 
   const value = useMemo<DraftContextValue>(
     () => ({
@@ -51,9 +58,11 @@ export function BookingDraftProvider({ children }: { children: ReactNode }) {
         setDraft((d) =>
           leg === 'outbound' ? { ...d, outbound: selection, inbound: null } : { ...d, inbound: selection },
         ),
-      clearSelection: () => setDraft((d) => ({ ...d, outbound: null, inbound: null })),
+      clearSelection: () =>
+        setDraft((d) => (d.outbound || d.inbound ? { ...d, outbound: null, inbound: null } : d)),
+      createBookingKeys,
     }),
-    [draft],
+    [draft, createBookingKeys],
   );
 
   return <DraftContext.Provider value={value}>{children}</DraftContext.Provider>;

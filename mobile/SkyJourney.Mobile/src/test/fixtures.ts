@@ -1,4 +1,5 @@
 import type { AuthResponse, UserProfile } from '@/api/auth';
+import type { Booking, SeatMap, SeatMapSeat } from '@/api/bookings';
 import type { Airport, FlightOffer } from '@/api/types';
 
 export const BUD: Airport = { iataCode: 'BUD', name: 'Budapest Ferenc Liszt International', city: 'Budapest', countryCode: 'HU', timeZoneId: 'Europe/Budapest' };
@@ -52,4 +53,55 @@ export function authResponse(n: number, user: UserProfile = TRAVELLER): AuthResp
     refreshTokenExpiresAt: '2026-11-09T12:00:00+00:00',
     user,
   };
+}
+
+const eur = (amount: number) => ({ amount, currency: 'EUR' });
+
+/** Builds an unpaid one-way booking for two adults, BUD → LHR. */
+export function booking(overrides: Partial<Booking> = {}): Booking {
+  const flight = offer({ dep: '09:00', arr: '10:30' });
+  return {
+    id: 'booking-1',
+    reference: 'SJ7K2Q',
+    status: 'PendingPayment',
+    createdAt: '2026-10-10T12:00:00+00:00',
+    expiresAt: '2026-10-10T12:20:00+00:00',
+    confirmedAt: null,
+    cancelledAt: null,
+    totalPrice: eur(200),
+    refundedAmount: eur(0),
+    passengers: [
+      { id: 'p1', sequence: 1, firstName: 'Ada', lastName: 'Lovelace', type: 'Adult' },
+      { id: 'p2', sequence: 2, firstName: 'Charles', lastName: 'Babbage', type: 'Adult' },
+    ],
+    segments: [
+      {
+        id: 'seg-1',
+        direction: 'Outbound',
+        flight: { ...flight, status: 'Scheduled' },
+        fareFamily: 'Basic',
+        farePricePerPassenger: eur(100),
+        fareConditions: conditions,
+        seats: [],
+      },
+    ],
+    dataSource: 'Mock',
+    ...overrides,
+  };
+}
+
+/** A two-row, four-abreast seat map (`AB CD`); row 1 is Front, 1B is taken. */
+export function seatMap(overrides: Partial<SeatMap> = {}): SeatMap {
+  const seats: SeatMapSeat[] = [1, 2].flatMap((row) =>
+    ['A', 'B', 'C', 'D'].map((letter) => ({
+      seatNumber: `${row}${letter}`,
+      row,
+      letter,
+      category: row === 1 ? 'Front' : 'Standard',
+      price: eur(row === 1 ? 9.99 : 6.99),
+      availability: row === 1 && letter === 'B' ? 'Occupied' : 'Available',
+      passengerId: null,
+    })),
+  );
+  return { segmentId: 'seg-1', flightNumber: 'SJ100', aircraftName: 'Airbus A320', rows: 2, seatLetters: 'ABCD', seats, ...overrides };
 }

@@ -61,6 +61,9 @@ Mobile test conventions:
   in-memory fakes and use deferred promises to drive races such as concurrent refreshes.
 - Screen tests render the real screen inside the real providers and mock only `expo-router` and native modules
   (`expo-secure-store`).
+- Booking-flow screen tests spy on `bookingsApi` instead of `fetch`, and check which idempotency key each payment
+  attempt used: a new key after a decline, the same key after a lost response. Test `QueryClient`s set
+  `gcTime: Infinity`, so no cache timers keep Jest running after the tests.
 - jest-expo replaces the global `fetch` with a stub, so jest tests can't reach a running API. Live checks against the
   local API are manual (see the implementation log), and E2E is covered in M20.
 

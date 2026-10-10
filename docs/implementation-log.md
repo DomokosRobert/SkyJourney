@@ -230,3 +230,44 @@ is filled in by the next commit (or listed in the final report).
   - The charge is not cancellable once started (`CancellationToken.None`), so a disconnecting client cannot leave
     money taken without a recorded outcome.
   - Jobs are disabled in tests and invoked through `RunOnceAsync`, so they never race with assertions.
+
+## M13 — `feat(mobile): implement booking and checkout flow`
+- **Previous commit:** M12 = `2032dd3`.
+- **What it adds:**
+  - **Trip summary:** a Continue button that leads to sign-in if needed.
+  - **Passengers screen:** React Hook Form with Zod and a field array. Adults are listed first and the account holder is
+    pre-filled. It creates the booking with an `Idempotency-Key`.
+  - **Seats screen:** segment and passenger chips, plus an accessible seat map with category prices, taken seats and
+    the booking's passengers' initials. Each tap saves one passenger's seat, then moves to the next passenger without
+    one. Conflicts are explained and the map is reloaded.
+  - **Checkout screen:** a server-priced breakdown and a choice of simulated payment outcomes, with a notice that no
+    real payment is taken and no card details are collected.
+  - **Confirmation screen:** the booking reference and a summary. It clears the booking draft.
+  - **Shared pieces:**
+    - `PendingBookingGate` shows each step only while the booking awaits payment.
+    - `HoldBanner` shows a live countdown that reloads the booking when the hold lapses.
+    - `createIdempotencyKeys` keeps one key per request body until a definite outcome.
+  - **New dependency:** `expo-crypto` (`randomUUID`), installed with `npx expo install`.
+- **Validation:**
+  - ✅ `npm run typecheck`, ✅ `npm run lint`, ✅ `npx expo-doctor` (21/21), ✅ `npx expo export --platform ios`.
+  - ✅ `npm test`: 97/97, of which 29 are new.
+    - Unit tests cover the idempotency keys, the passenger schema and request building, seat-map layout and next
+      passenger, the hold countdown, and error classification and messages.
+    - Component tests cover `SeatMapView` (accessibility labels, taken seats can't be pressed, initials).
+    - Checkout screen tests cover:
+      - Paying with the chosen method.
+      - A decline followed by success with a new key.
+      - A lost response retried with the same key.
+      - An expired hold shown instead of the pay button.
+  - On the iOS simulator (Expo Go), the new routes load from a fresh Metro bundle, and the passengers screen shows its
+    signed-out state.
+  - ⚠️ Not done: tapping through the whole flow on the simulator. I can't drive the simulator from here. The API side of
+    the same sequence was checked by hand in M12, and E2E tests are planned for M20.
+- **Notes:**
+  - Metro started with `CI=1` does not watch files. New route files only appear after Metro restarts.
+  - Test `QueryClient`s use `gcTime: Infinity`. Otherwise cache timers keep Jest running after the tests finish.
+- **Decisions:**
+  - Seats are saved per tap, not batched at the end. The server is the source of truth for who holds a seat, and a
+    conflict shows up straight away rather than at checkout.
+  - The create-booking key lives in the draft context. Going back and pressing Continue again replays the same booking
+    instead of creating (and holding seats for) a second one.

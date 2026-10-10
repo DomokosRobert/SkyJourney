@@ -180,11 +180,11 @@ mobile/SkyJourney.Mobile/src
   app/                 Expo Router routes (file-based navigation)
     (tabs)/            Search, Trips, Profile
     search/            results, flight details
-    booking/           passengers, seats, review, payment, confirmation
+    booking/           passengers, [reference]/seats, [reference]/checkout, [reference]/confirmation
     auth/              login, register
   api/                 typed fetch client (Problem Details → ApiError), endpoints, query client
   auth/                AuthProvider, SecureStore token persistence, refresh single-flight
-  booking/             booking-draft context (search criteria and selected flights)
+  booking/             booking-draft context, idempotency keys, seat-map layout, hold countdown, booking gate
   components/          design system (Button, Card, TextField, Screen, loading/empty/error states)
   lib/                 formatting (airport-local times), network status
   theme/               colors, spacing, typography tokens
@@ -201,6 +201,29 @@ Routes live in `src/app` (the Expo SDK 57 template convention) and imports use t
 - Airport-local times are displayed by reading the wall-clock part of the API's offset-qualified ISO strings, never by
   converting to the phone's time zone.
 - The refresh token is stored in SecureStore (iOS Keychain / Android Keystore). The access token stays in memory only.
+
+### Booking flow (mobile)
+
+`search/summary` → `booking/passengers` (sign-in required) → `booking/[reference]/seats` → `booking/[reference]/checkout`
+→ `booking/[reference]/confirmation`.
+
+- **The server owns prices and state.** Each screen after creation reads the booking by reference;
+  `PendingBookingGate` renders the step only while the booking is `PendingPayment`. It redirects confirmed bookings to
+  the confirmation screen and explains expired or cancelled ones. A banner counts down the hold. When the hold reaches
+  zero, the banner reloads the booking so the server decides the outcome.
+- **Idempotency keys.** Requests that create something carry an `Idempotency-Key` from `createIdempotencyKeys`, which
+  returns the same key for the same request body until it is reset.
+  - The create-booking keys live in the draft context, so pressing Continue again after going back replays the same
+    booking instead of creating a second one.
+  - The checkout screen keeps its own payment keys.
+  - Keys are reset after a definite outcome: a recorded payment (approved or declined) or a 4xx. They are kept after a
+    network error or 5xx, when the server may have processed the request. The retry then replays it rather than paying
+    twice.
+- **Seats** are saved one passenger at a time (`PUT …/seats` with one assignment); selection then moves to the next
+  passenger without a seat. A conflict (`seat_unavailable`) shows a message, and the seat map is reloaded after every
+  attempt. Seat selection is optional.
+- **Payment** only offers the simulated test tokens; the app never asks for card details. A decline leaves the booking
+  payable. Any payment error reloads the booking, so an expired hold is shown as expired.
 
 ## Deployment (prepared, not deployed)
 - The API ships as a multi-stage Docker image running as the non-root `app` user.

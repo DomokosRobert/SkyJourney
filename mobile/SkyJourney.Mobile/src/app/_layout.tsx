@@ -28,6 +28,13 @@ export default function RootLayout() {
             <Stack.Screen name="search/results" options={{ title: 'Flights' }} />
             <Stack.Screen name="search/flight/[flightId]" options={{ title: 'Flight details' }} />
             <Stack.Screen name="search/summary" options={{ title: 'Your trip' }} />
+            <Stack.Screen name="booking/passengers" options={{ title: 'Passengers' }} />
+            <Stack.Screen name="booking/[reference]/seats" options={{ title: 'Seats' }} />
+            <Stack.Screen name="booking/[reference]/checkout" options={{ title: 'Payment' }} />
+            <Stack.Screen
+              name="booking/[reference]/confirmation"
+              options={{ title: 'Confirmed', headerBackVisible: false, gestureEnabled: false }}
+            />
             <Stack.Screen name="auth/login" options={{ presentation: 'modal', title: 'Sign in' }} />
             <Stack.Screen name="auth/register" options={{ presentation: 'modal', title: 'Create account' }} />
           </Stack>

@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
+import { useAuthState } from '@/auth/AuthProvider';
 import { useBookingDraft, type FareSelection } from '@/booking/BookingDraftContext';
 import { AppText, Button, Card, DemoDataNotice, EmptyState, Screen } from '@/components';
 import { formatDate, formatLocalTime, formatMoney } from '@/lib/format';
@@ -9,6 +10,7 @@ import { colors, spacing } from '@/theme';
 
 export default function TripSummaryScreen() {
   const { criteria, outbound, inbound } = useBookingDraft();
+  const { status } = useAuthState();
   const needsReturn = criteria.tripType === 'return';
 
   if (!outbound || (needsReturn && !inbound)) {
@@ -27,7 +29,14 @@ export default function TripSummaryScreen() {
   const total = selections.reduce((sum, s) => sum + s.fare.totalPrice.amount, 0);
 
   return (
-    <Screen>
+    <Screen
+      footer={
+        <Button
+          title={status === 'signedIn' ? 'Continue to passengers' : 'Sign in to continue'}
+          disabled={status === 'loading'}
+          onPress={() => router.push(status === 'signedIn' ? '/booking/passengers' : '/auth/login')}
+        />
+      }>
       <AppText variant="heading">Your trip</AppText>
       <SegmentSummary title="Outbound" selection={outbound} />
       {inbound ? <SegmentSummary title="Return" selection={inbound} /> : null}
@@ -42,8 +51,8 @@ export default function TripSummaryScreen() {
           </AppText>
         </View>
         <AppText variant="caption">
-          Indicative price from your search. The final price is confirmed by SkyJourney when the booking is created; paid
-          seat selection is added in the next steps.
+          Indicative price from your search. The final price is confirmed by SkyJourney when the booking is created;
+          optional paid seats can be added in the next steps.
         </AppText>
       </Card>
       <Button title="Change flights" variant="secondary" onPress={() => router.dismissTo('/search/results')} />
