@@ -64,6 +64,28 @@ While an attempt is `Pending` and younger than `Booking.PaymentTimeout` (2 min),
 cannot be changed or cancelled (`409 payment_in_progress`). An older pending attempt is treated as abandoned: it is marked
 `Failed` (`payment_timeout`) by the next payment, cancellation or expiry.
 
+A booking whose flight has been cancelled by the airline cannot be paid (`409 flight_cancelled`). This guard covers
+a booking that a flight cancellation skipped because a payment was in progress at that moment.
+
+### Admin API (`/api/v1/admin`, `Admin` role)
+Anonymous callers get `401` and signed-in non-admins get `403`. Responses carry the booking owner's user id, but no
+contact details.
+
+| Area | Routes | Notes |
+|------|--------|-------|
+| Airports | `GET /airports`, `POST /airports`, `PUT /airports/{iata}`, `POST /airports/{iata}/activate` / `deactivate` | Airports are never deleted. Deactivating hides an airport from search and new schedules; existing flights are unaffected. |
+| Schedules | `GET /schedules`, `POST /schedules` | Creating a schedule generates its flights for today plus `HorizonDays` straight away. Overlapping dates for one flight number are `409 schedule_overlap`. Schedules are create-only, because editing a timetable with sold flights is a re-accommodation problem that is out of scope. |
+| Flights | `GET /flights` (date, route, number, status), `GET /flights/{id}`, `PUT /flights/{id}/fares/{family}`, `POST /flights/{id}/cancel` | A fare change applies to new bookings only (fare snapshot). |
+| Bookings | `GET /bookings` (reference, flight, user, status), `GET /bookings/{reference}` (with history and payment attempts), `POST /bookings/{reference}/cancel` | |
+
+**Flight cancellation** (`AdminFlightService.CancelAsync`) runs in three steps and is safe to repeat:
+1. Commit `Flight.Status = Cancelled`. From then on, `FlightCapacity` refuses reservations, because it checks the
+   status in the same statement, and `PaymentService` refuses payments.
+2. Expire lapsed holds on the flight.
+3. Cancel each `PendingPayment` or `Confirmed` booking in its own transaction, as `BookingActor.Administrator`, with a
+   full simulated refund. Bookings with a payment in progress, or ones changed concurrently, are returned as `skipped`;
+   calling the endpoint again processes them.
+
 ### Background jobs (`Infrastructure/Jobs`, `BackgroundJobs` settings)
 | Job | Default interval | Work |
 |-----|------------------|------|
@@ -132,7 +154,8 @@ Payment attempts go `Pending → Succeeded | Failed`. A succeeded payment can th
 - A `Confirmed` booking can be cancelled up to **24 hours before the first departure**.
 - The refund for each segment is `fare paid × refund percentage` of its snapshotted fare family:
   Basic 0%, Plus 50%, Flex 100%. Seat fees are refunded only on Flex segments.
-- An admin can cancel any active booking with a full refund (for example, when a flight is cancelled).
+- An admin can cancel any active booking with a full refund, ignoring the 24-hour cutoff and fare rules (for example,
+  when a flight is cancelled). The history records the `Administrator` actor and the reason.
 - Cancelling releases the seats and decrements `Flight.SeatsSold`.
 
 ## Concurrency and consistency

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using SkyJourney.Application.Bookings;
 using SkyJourney.Application.Common;
 using SkyJourney.Domain.Bookings;
+using SkyJourney.Domain.Flights;
 
 namespace SkyJourney.Application.Payments;
 
@@ -31,7 +32,13 @@ public sealed partial class PaymentService(
         var normalized = reference.Trim().ToUpperInvariant();
         var target = await db.Bookings.AsNoTracking()
             .Where(b => b.UserId == userId && b.Reference == normalized)
-            .Select(b => new { b.Id, b.Reference, FlightIds = b.Segments.Select(s => s.FlightId).ToList() })
+            .Select(b => new
+            {
+                b.Id,
+                b.Reference,
+                FlightIds = b.Segments.Select(s => s.FlightId).ToList(),
+                FlightCancelled = b.Segments.Any(s => s.Flight.Status == FlightStatus.Cancelled),
+            })
             .SingleOrDefaultAsync(cancellationToken)
             ?? throw new NotFoundException("Booking", reference);
 
@@ -39,6 +46,12 @@ public sealed partial class PaymentService(
         if (await FindReplayAsync(target.Id, target.Reference, idempotencyKey, requestHash, cancellationToken) is { } replay)
         {
             return new PaymentResult(replay, Created: false);
+        }
+
+        if (target.FlightCancelled)
+        {
+            throw new ConflictException("flight_cancelled",
+                "A flight in this booking has been cancelled by the airline. The booking can no longer be paid.");
         }
 
         await expiry.ExpireDueAsync(target.FlightIds, BookingExpiryService.LazyBatchSize, cancellationToken);

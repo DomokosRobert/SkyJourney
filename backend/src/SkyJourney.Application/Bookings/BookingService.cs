@@ -331,19 +331,22 @@ public sealed class BookingService(ISkyJourneyDbContext db, ICurrentUser current
             throw new NotFoundException("Booking", reference);
         }
 
-        var query = OwnBookings(reference)
-            .Include(b => b.Passengers)
-            .Include(b => b.Segments).ThenInclude(s => s.SeatReservations)
-            .Include(b => b.Segments).ThenInclude(s => s.Flight).ThenInclude(f => f.Airline)
-            .Include(b => b.Segments).ThenInclude(s => s.Flight).ThenInclude(f => f.Origin)
-            .Include(b => b.Segments).ThenInclude(s => s.Flight).ThenInclude(f => f.Destination)
-            .Include(b => b.Segments).ThenInclude(s => s.Flight).ThenInclude(f => f.AircraftType)
-            .Include(b => b.Payments)
-            .AsSplitQuery();
+        var query = WithDetails(OwnBookings(reference));
 
         return await (tracked ? query : query.AsNoTracking()).SingleOrDefaultAsync(cancellationToken)
                ?? throw new NotFoundException("Booking", reference);
     }
+
+    /// <summary>Everything <see cref="ToDto(Booking, DateTimeOffset)"/> and the booking's own rules need.</summary>
+    internal static IQueryable<Booking> WithDetails(IQueryable<Booking> bookings) => bookings
+        .Include(b => b.Passengers)
+        .Include(b => b.Segments).ThenInclude(s => s.SeatReservations)
+        .Include(b => b.Segments).ThenInclude(s => s.Flight).ThenInclude(f => f.Airline)
+        .Include(b => b.Segments).ThenInclude(s => s.Flight).ThenInclude(f => f.Origin)
+        .Include(b => b.Segments).ThenInclude(s => s.Flight).ThenInclude(f => f.Destination)
+        .Include(b => b.Segments).ThenInclude(s => s.Flight).ThenInclude(f => f.AircraftType)
+        .Include(b => b.Payments)
+        .AsSplitQuery();
 
     private static BookingSegment FindSegment(Booking booking, Guid segmentId) =>
         booking.Segments.SingleOrDefault(s => s.Id == segmentId) ?? throw new NotFoundException("Booking segment", segmentId);

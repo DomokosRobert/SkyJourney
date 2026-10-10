@@ -74,6 +74,7 @@ try
     api.MapFlightEndpoints();
     api.MapAuthEndpoints();
     api.MapBookingEndpoints();
+    api.MapAdminEndpoints();
 
     await app.RunAsync();
 }

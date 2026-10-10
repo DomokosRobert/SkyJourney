@@ -60,17 +60,25 @@ public sealed partial class FlightDataImporter(
         return result;
     }
 
-    /// <summary>Creates flights for every schedule operating between <paramref name="from"/> and <paramref name="to"/> (inclusive).</summary>
-    public async Task<int> GenerateFlightsAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Creates flights for every schedule (or only <paramref name="scheduleId"/>) operating between
+    /// <paramref name="from"/> and <paramref name="to"/> (inclusive).
+    /// </summary>
+    public async Task<int> GenerateFlightsAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken = default,
+        Guid? scheduleId = null)
     {
-        var schedules = await db.FlightSchedules
+        var query = db.FlightSchedules
             .Include(s => s.Airline)
             .Include(s => s.Origin)
             .Include(s => s.Destination)
             .Include(s => s.AircraftType)
-            .Where(s => s.ValidFrom <= to && s.ValidTo >= from)
-            .OrderBy(s => s.FlightNumber)
-            .ToListAsync(cancellationToken);
+            .Where(s => s.ValidFrom <= to && s.ValidTo >= from);
+        if (scheduleId is { } id)
+        {
+            query = query.Where(s => s.Id == id);
+        }
+
+        var schedules = await query.OrderBy(s => s.FlightNumber).ToListAsync(cancellationToken);
 
         var existing = (await db.Flights
                 .Where(f => f.DepartureLocalDate >= from && f.DepartureLocalDate <= to)

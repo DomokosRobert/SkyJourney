@@ -3,6 +3,7 @@
 @baseUrl = http://localhost:5080
 @date = 2026-11-02
 @returnDate = 2026-11-06
+@flightId = <flight-id-from-admin-list-or-search>
 
 ### Health
 GET {{baseUrl}}/health/ready
@@ -100,3 +101,47 @@ POST {{baseUrl}}/api/v1/auth/logout
 Content-Type: application/json
 
 { "refreshToken": "{{login.response.body.refreshToken}}" }
+
+### ---------------------------------------------------------------------------
+### Admin (the account must be promoted first: dotnet run --project src/SkyJourney.Api -- promote-admin <email>,
+### then log in again so the token carries the Admin role)
+
+### List flights on a date
+GET {{baseUrl}}/api/v1/admin/flights?date=2026-11-05&origin=BUD
+Authorization: Bearer {{login.response.body.accessToken}}
+
+### Reprice a fare (applies to new bookings only)
+PUT {{baseUrl}}/api/v1/admin/flights/{{flightId}}/fares/Basic
+Authorization: Bearer {{login.response.body.accessToken}}
+Content-Type: application/json
+
+{ "price": 79.99, "isAvailable": true }
+
+### Cancel a flight and all of its bookings, with full simulated refunds
+POST {{baseUrl}}/api/v1/admin/flights/{{flightId}}/cancel
+Authorization: Bearer {{login.response.body.accessToken}}
+Content-Type: application/json
+
+{ "reason": "Operational reasons" }
+
+### Create a schedule (flights are generated for the booking horizon)
+POST {{baseUrl}}/api/v1/admin/schedules
+Authorization: Bearer {{login.response.body.accessToken}}
+Content-Type: application/json
+
+{
+  "flightNumber": "SJ9100", "airlineCode": "SJ", "originIata": "BUD", "destinationIata": "LHR", "aircraftCode": "A320",
+  "departureLocalTime": "21:15:00", "durationMinutes": 160, "operatingDays": ["Tuesday", "Thursday"],
+  "validFrom": "2026-11-01", "validTo": "2027-03-27", "baseFare": 69, "currency": "EUR"
+}
+
+### Find bookings by reference and cancel one on behalf of the airline
+GET {{baseUrl}}/api/v1/admin/bookings?reference={{booking.response.body.reference}}
+Authorization: Bearer {{login.response.body.accessToken}}
+
+###
+POST {{baseUrl}}/api/v1/admin/bookings/{{booking.response.body.reference}}/cancel
+Authorization: Bearer {{login.response.body.accessToken}}
+Content-Type: application/json
+
+{ "reason": "Goodwill cancellation" }

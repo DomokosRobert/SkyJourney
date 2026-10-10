@@ -36,6 +36,10 @@ Both test projects use **xUnit v3 on Microsoft Testing Platform**. `backend/glob
 - Payment tests (`PaymentTests`) cover outcomes per test token, replay and key reuse, 8 parallel payments with different
   keys (exactly one charge), 6 parallel retries with one key (one attempt), paying after the hold lapsed (own clock), and
   the per-user payment rate limit (own host with a limit of 2).
+- Admin tests (`AdminTests`) sign in a user promoted with `AdminProvisioning.PromoteAsync`. Promotion applies to
+  the next token, so they log in again. They use BUD-DXB 13 Nov, BUD-KEF 14 and 16 Nov, BUD-OSL 2 Nov, and airports they
+  create themselves (codes `QX*`). Avoid city names containing "lon", because the airport-search ranking test relies on
+  them.
 - Background jobs are disabled in tests (`BackgroundJobs:Enabled=false`). `JobTests` resolves the job from the host's
   hosted services and calls `RunOnceAsync`. The expiry test moves only its own booking's `expires_at` into the past, so the
   shared clock stays frozen; the horizon test uses its own clock one day ahead and checks flights appear on day 22 only.

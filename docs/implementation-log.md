@@ -302,3 +302,37 @@ is filled in by the next commit (or listed in the final report).
   - Bookings are shown as one list, newest first, with status badges. They are not split into upcoming and past tabs,
     because sections built on the client from paged data would move items around as more pages load.
   - Unpaid bookings can be cancelled too; the domain allows it, and it releases the held seats straight away.
+
+## M15 — `feat(admin): implement flight management capabilities`
+- **Previous commit:** M14 = `fd23dd1`.
+- **What it adds:** the `/api/v1/admin` API, which requires the `Admin` role.
+  - **Airports:** list, create, update, activate and deactivate. Airports are never deleted.
+  - **Schedules:** list and create. Creating a schedule generates its flights for the horizon straight away.
+  - **Flights:** list and filter with load and fares, reprice or close a fare, and cancel a flight. Cancelling a flight
+    cancels and fully refunds all of its active bookings.
+  - **Bookings:** search, a detail view with history and payment attempts, and cancellation on behalf of the airline
+    (full refund, ignoring the 24-hour cutoff).
+  - **Payments:** `PaymentService` refuses payment for a booking whose flight is cancelled (`409 flight_cancelled`).
+  - **Refactoring:** `FlightDataImporter.GenerateFlightsAsync` can be limited to one schedule, and `BookingService`
+    shares its booking query and DTO mapping with the admin services.
+- **Validation:**
+  - ✅ `dotnet build` (0 warnings), ✅ `dotnet format --verify-no-changes`.
+  - ✅ `dotnet ef migrations has-pending-model-changes`: none. M15 needs no schema change.
+  - ✅ `dotnet test`: 206/206, of which 7 are new admin integration tests:
+    - Role enforcement (401 and 403).
+    - Airport lifecycle and search visibility.
+    - Schedule creation: generated flights, overlap, unknown aircraft, wrong airline prefix, and validation.
+    - Fare repricing and closing: existing bookings keep their price, and new bookings get the new price or are refused.
+    - Flight cancellation: confirmed and unpaid bookings are cancelled, the refund is full even on Basic, capacity is
+      released, and a repeat cancels nothing.
+    - The payment guard for a cancelled flight.
+    - Admin booking search and cancellation inside the customer's 24-hour cutoff.
+  - ⚠️ Not done: exercising the new `.http` admin requests by hand against the dev API. The integration tests cover the
+    same endpoints through the real HTTP pipeline and database.
+- **Decisions:**
+  - The flight's status is committed before its bookings are processed, and each booking is cancelled in its own
+    transaction. A booking with a payment in flight is reported as skipped rather than blocking the whole operation, and
+    repeating the call finishes it.
+  - Schedules are create-only. Changing a timetable that has sold flights needs re-accommodation, which is out of scope.
+  - Known edge case: two schedules for the same flight number created at the same instant could both pass the overlap
+    check. The flights' unique index (number + local date) still prevents duplicate flights.
