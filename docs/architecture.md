@@ -36,6 +36,22 @@ Dependencies point inward: `Api → Application → Domain`, and `Infrastructure
 - Minimal APIs grouped by feature under `/api/v1`. Endpoints only bind, authorize and call one
   application service method ([ADR-0002](adr/0002-rest-minimal-apis-and-url-versioning.md)).
 - Errors use RFC 9457 Problem Details. Domain and application errors map to 400/404/409/422.
+- Domain entities create their own UUIDv7 ids, so every `Entity.Id` is mapped `ValueGeneratedNever`. Otherwise EF Core
+  would treat a child added to a tracked aggregate (a seat hold, a payment attempt) as existing and issue an `UPDATE`.
+- `SaveChangesAsync` translates PostgreSQL unique violations into `UniqueConstraintViolationException` carrying the
+  constraint name, so services can map specific indexes to specific errors without depending on Npgsql.
+
+### Booking endpoints (`/api/v1/bookings`, authenticated)
+
+| Method | Path | Result |
+|--------|------|--------|
+| POST | `/` | Requires `Idempotency-Key`. `201` + `Location` for a new booking, `200` for a replay (`Idempotent-Replayed: true`), `409 insufficient_capacity` / `invalid_itinerary`, `422 idempotency_key_reused` |
+| GET | `/` | The caller's bookings, newest first (paged), with `isUpcoming` |
+| GET | `/{reference}` | Full booking: passengers, segments with fare snapshot and conditions, seats, totals |
+| GET | `/{reference}/segments/{segmentId}/seat-map` | Layout with `Available` / `Occupied` / `Selected` and the price of each seat for the segment's fare |
+| PUT | `/{reference}/segments/{segmentId}/seats` | Replaces the listed passengers' seats on that flight; `409 seat_unavailable` / `booking_expired`, `422 seat_not_found` / `passenger_not_in_booking` |
+| GET | `/{reference}/cancellation` | Whether cancelling is allowed now and the refund it would give |
+| POST | `/{reference}/cancel` | Cancels, releases seats and capacity, records the (simulated) refund |
 
 ## Domain model
 
@@ -104,9 +120,10 @@ Payment attempts go `Pending → Succeeded | Failed`. A succeeded payment can th
 | Risk | Control |
 |------|---------|
 | Overselling flight capacity | An atomic conditional update: `UPDATE flights SET seats_sold = seats_sold + n WHERE id = @id AND seats_sold + n <= capacity`. If no row is affected, the flight is sold out. This runs in the same transaction as the booking insert. |
-| The same seat sold twice | A partial unique index on active seat reservations. A violation (`23505`) maps to `409 seat_unavailable`. Expired holds on the flight are released inside the same transaction before new holds are inserted. |
+| The same seat sold twice | A partial unique index on active seat reservations. A violation (`23505`) maps to `409 seat_unavailable`. Before seats are assigned or a booking is created, lapsed holds on the affected flights are expired (lazy expiry, below). |
 | Payment racing the hold expiry | `Booking` uses PostgreSQL `xmin` as an optimistic concurrency token. The losing transaction gets a `DbUpdateConcurrencyException`, which maps to `409`. |
 | Duplicate bookings from retries | The `Idempotency-Key` header is required. There is a unique `(user_id, idempotency_key)` index plus a request hash: the same key with the same body returns the original booking, and the same key with a different body returns `422`. |
+| Lapsed holds still blocking seats | **Lazy expiry**: booking creation, seat selection and cancellation first expire due `PendingPayment` bookings on the affected flights, each in its own short transaction (a concurrency conflict means another request got there first and is ignored). Reads report a lapsed hold as `Expired` even before it is persisted. A background job (M12) sweeps the rest. |
 | Duplicate payments | `Idempotency-Key` with a unique `(booking_id, idempotency_key)` index. A booking can only be confirmed once. |
 
 ## Time handling

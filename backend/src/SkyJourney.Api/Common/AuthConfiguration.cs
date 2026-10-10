@@ -83,7 +83,7 @@ public static class AuthConfiguration
             if (origins.Length > 0)
             {
                 policy.WithOrigins(origins).AllowAnyHeader().AllowAnyMethod()
-                    .WithExposedHeaders(CorrelationIdMiddleware.HeaderName);
+                    .WithExposedHeaders(CorrelationIdMiddleware.HeaderName, Endpoints.BookingEndpoints.ReplayedHeader);
             }
         }));
 

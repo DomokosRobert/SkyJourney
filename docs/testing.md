@@ -28,6 +28,11 @@ Both test projects use **xUnit v3 on Microsoft Testing Platform**. `backend/glob
 - Auth tests register a unique `user-<guid>@example.com` per test. Tests that move time forward (token expiry)
   or need different settings (rate limits) start a second in-memory host on the same database with its own
   `FakeTimeProvider` (`factory.WithOwnClock(...)`), so the shared frozen clock never changes.
+- Booking tests each use their own route/date (listed in `BookingTests`). Concurrency tests fire parallel requests
+  through the real HTTP pipeline at the real database: 10 users racing for the last 3 seats (exactly 3 succeed),
+  6 users racing for one seat (exactly 1 succeeds), 8 retries with one idempotency key (one booking).
+  The hold-expiry test uses its own clock and signs in again after advancing it, because the hold (20 min) outlives the
+  access token (15 min).
 - The shared host raises the auth rate limit, because every in-memory request comes from the same "client IP".
 
 ### Mobile

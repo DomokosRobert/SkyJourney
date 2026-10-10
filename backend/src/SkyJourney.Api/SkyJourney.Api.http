@@ -46,6 +46,47 @@ Content-Type: application/json
 
 { "refreshToken": "{{login.response.body.refreshToken}}" }
 
+### Create a booking (hold for 20 minutes). Paste a flight id from a search result.
+# Repeat with the same Idempotency-Key to get the same booking back (200, Idempotent-Replayed: true).
+# @name booking
+POST {{baseUrl}}/api/v1/bookings
+Authorization: Bearer {{login.response.body.accessToken}}
+Content-Type: application/json
+Idempotency-Key: 0193b3c2-8a7e-7c4d-9f00-000000000001
+
+{
+  "outbound": { "flightId": "<flight-id-from-search>", "fareFamily": "Plus" },
+  "return": null,
+  "passengers": [ { "firstName": "Ada", "lastName": "Lovelace", "type": "Adult" } ]
+}
+
+### My bookings
+GET {{baseUrl}}/api/v1/bookings
+Authorization: Bearer {{login.response.body.accessToken}}
+
+### Booking details
+GET {{baseUrl}}/api/v1/bookings/{{booking.response.body.reference}}
+Authorization: Bearer {{login.response.body.accessToken}}
+
+### Seat map for the outbound segment
+GET {{baseUrl}}/api/v1/bookings/{{booking.response.body.reference}}/segments/{{booking.response.body.segments[0].id}}/seat-map
+Authorization: Bearer {{login.response.body.accessToken}}
+
+### Choose a seat
+PUT {{baseUrl}}/api/v1/bookings/{{booking.response.body.reference}}/segments/{{booking.response.body.segments[0].id}}/seats
+Authorization: Bearer {{login.response.body.accessToken}}
+Content-Type: application/json
+
+{ "seats": [ { "passengerId": "{{booking.response.body.passengers[0].id}}", "seatNumber": "12C" } ] }
+
+### Cancellation quote
+GET {{baseUrl}}/api/v1/bookings/{{booking.response.body.reference}}/cancellation
+Authorization: Bearer {{login.response.body.accessToken}}
+
+### Cancel
+POST {{baseUrl}}/api/v1/bookings/{{booking.response.body.reference}}/cancel
+Authorization: Bearer {{login.response.body.accessToken}}
+
 ### Logout
 POST {{baseUrl}}/api/v1/auth/logout
 Content-Type: application/json

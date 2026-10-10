@@ -33,6 +33,8 @@ public interface ISkyJourneyDbContext
 
     DatabaseFacade Database { get; }
 
+    ChangeTracker ChangeTracker { get; }
+
     EntityEntry Entry(object entity);
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using SkyJourney.Application.Airports;
+using SkyJourney.Application.Bookings;
 using SkyJourney.Application.FlightData;
 using SkyJourney.Application.Flights;
 
@@ -15,6 +16,8 @@ public static class DependencyInjection
         services.AddScoped<AirportService>();
         services.AddScoped<FlightSearchService>();
         services.AddScoped<FlightDataImporter>();
+        services.AddScoped<BookingService>();
+        services.AddScoped<BookingExpiryService>();
         return services;
     }
 }

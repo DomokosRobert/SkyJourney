@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+
 namespace SkyJourney.Application.Common;
 
 public sealed class NotFoundException(string resource, object key)
@@ -25,4 +27,14 @@ public sealed class ForbiddenException(string message) : Exception(message);
 public sealed class UnauthorizedException(string code, string message) : Exception(message)
 {
     public string Code { get; } = code;
+}
+
+/// <summary>
+/// A unique index rejected a write (PostgreSQL 23505). Raised by the DbContext so application code can react to
+/// specific constraints (e.g. a seat taken by a concurrent request) without depending on the database driver.
+/// </summary>
+public sealed class UniqueConstraintViolationException(string? constraintName, Exception innerException)
+    : DbUpdateException($"Unique constraint '{constraintName}' was violated.", innerException)
+{
+    public string? ConstraintName { get; } = constraintName;
 }

@@ -13,7 +13,8 @@ in application code are racy.
 3. **Booking aggregate:** PostgreSQL `xmin` system column as an optimistic concurrency token for
    state transitions (payment vs. expiry vs. cancellation).
 4. Holds expire with the booking (20 minutes). A background service expires stale bookings every
-   minute. Seat assignment also releases expired holds for the flight inside its own transaction.
+   minute. Booking creation, seat assignment and cancellation also expire due bookings on the affected
+   flights first (each in its own short transaction), so a lapsed hold never blocks a seat until the next sweep.
 
 ## Alternatives
 - `SELECT … FOR UPDATE` on the flight row: correct, but it serialises all bookings on a flight and holds locks longer.

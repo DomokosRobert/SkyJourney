@@ -177,3 +177,29 @@ is filled in by the next commit (or listed in the final report).
     UI signed in offline, and the next request retries).
   - The `expo-secure-store` config plugin is not added: it only configures Face ID usage text, which the app doesn't use.
   - `npm run typecheck` now regenerates typed routes first (see `docs/testing.md`), which CI needs too.
+
+## M11 — `feat(bookings): implement booking creation, seats and cancellation`
+- **Previous commit:** M10 = `341743d`.
+- **Content:** `BookingService` and `/api/v1/bookings` endpoints: create (one-way or return, 1–9 passengers, at least
+  one adult, fare snapshot, 20-minute hold) with a required `Idempotency-Key` (request-hash check, `Idempotent-Replayed`
+  header, race-safe via the unique index); list/detail; per-segment seat map with server-side seat prices; seat selection
+  (replace-per-passenger, unique-index arbitration → `409 seat_unavailable`); cancellation quote and cancel with
+  fare-rule refunds (simulated). Capacity uses an atomic conditional `UPDATE` (`FlightCapacity`). `BookingExpiryService`
+  lazily expires due holds on the affected flights before writes; reads report lapsed holds as `Expired`.
+  `SaveChangesAsync` maps PostgreSQL unique violations to `UniqueConstraintViolationException` with the constraint name.
+- **Validation:** ✅ `dotnet build` (0 warnings); ✅ `dotnet format --verify-no-changes`; ✅ `dotnet test` 174/174
+  (112 unit, incl. new booking validator and `Idempotency-Key` tests; 62 integration, incl. 13 booking tests: return
+  booking with fare snapshot and totals, idempotent replay and key reuse, 8 concurrent retries with one key → one booking,
+  10 users racing for the last 3 seats → exactly 3 × 201 and 7 × 409, 6 users racing for one seat → exactly one success,
+  seat pricing per category and Flex free seats, IDOR → 404, cancellation of pending and confirmed Plus bookings
+  (50% refund), the 24-hour cutoff, and lazy expiry with a dedicated clock); `has-pending-model-changes` reports none.
+  Manually against the dev API: register → search → create (201) → replay (200, `Idempotent-Replayed: true`) → seat map
+  (A320, 180 seats) → seat 12C (+15.99) → quote → cancel → list.
+- **Bug found by the tests:** domain entities generate their own Guid ids, but EF Core's convention treated Guid keys as
+  store-generated, so children added to a tracked aggregate (seat holds, payment attempts) were sent as `UPDATE`s and
+  failed with concurrency exceptions. All `Entity.Id`s are now `ValueGeneratedNever` (no schema change, no migration).
+- **Decisions:**
+  - Lazy expiry runs each due booking in its own short transaction before the main one; a concurrency conflict there
+    means another request already handled it.
+  - The hold (20 min) outlives the access token (15 min); clients refresh transparently, the expiry test signs in again.
+  - The payment API is not part of this milestone; tests confirm bookings through the domain model until M12.

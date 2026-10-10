@@ -73,6 +73,7 @@ try
     api.MapAirportEndpoints();
     api.MapFlightEndpoints();
     api.MapAuthEndpoints();
+    api.MapBookingEndpoints();
 
     await app.RunAsync();
 }
