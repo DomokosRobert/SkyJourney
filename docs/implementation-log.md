@@ -21,3 +21,15 @@ is filled in by the next commit (or listed in the final report).
 - **Content:** `.gitignore`, `.gitattributes`, `.editorconfig`, `docker-compose.yml` (PostgreSQL 17 on host port 5433 with a health check and named volume), `.env.example`.
 - **Validation:** ✅ `docker-compose config -q`; ✅ `docker-compose up -d`, container healthy.
 - **Note:** this machine has the standalone `docker-compose` binary (v5), not the `docker compose` CLI plugin. The docs show both forms.
+
+## M3 — `feat(backend): create API and application foundation`
+- **Previous commit:** M2 = `e30367e`.
+- **Content:** `backend/SkyJourney.sln` with Domain/Application/Infrastructure/Api projects; central package management;
+  `TreatWarningsAsErrors`; `global.json` (SDK 10.0.100+, rollForward latestFeature); repo-local `nuget.config` (nuget.org only);
+  local `dotnet-ef` tool; Serilog (compact JSON in production, readable in development); correlation-ID middleware;
+  `IExceptionHandler` → RFC 9457 problem details with a stable `code`; FluentValidation endpoint filter; `/health/live`, `/health/ready`;
+  OpenAPI document + Swagger UI (development only).
+- **Validation:** ✅ `dotnet build` (0 warnings); ✅ manual smoke test: `/health/ready` 200 against compose PostgreSQL,
+  `/openapi/v1.json` served, unknown route → `application/problem+json` 404 with echoed `X-Correlation-Id`.
+- **Package policy:** each package is pinned to the newest stable release that is at least two weeks old.
+- **Finding:** the machine-wide NuGet config includes a private corporate feed. The repo `nuget.config` clears it.
