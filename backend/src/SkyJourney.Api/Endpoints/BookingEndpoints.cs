@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using SkyJourney.Api.Common;
 using SkyJourney.Application.Bookings;
 using SkyJourney.Application.Common;
+using SkyJourney.Application.Payments;
 
 namespace SkyJourney.Api.Endpoints;
 
@@ -67,6 +68,30 @@ public static class BookingEndpoints
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
+        bookings.MapPost("/{reference}/payments", async (string reference, PayBookingRequest request,
+                [FromHeader(Name = IdempotencyKey.HeaderName)] string? idempotencyKey,
+                PaymentService service, HttpContext http, CancellationToken ct) =>
+            {
+                var result = await service.PayAsync(reference, request, IdempotencyKey.Require(idempotencyKey), ct);
+                http.Response.Headers[ReplayedHeader] = result.Created ? "false" : "true";
+                return result.Created
+                    ? Results.Created($"/api/v1/bookings/{result.Payment.Booking.Reference}", result.Payment)
+                    : Results.Ok(result.Payment);
+            })
+            .Validate<PayBookingRequest>()
+            .RequireRateLimiting(AuthConfiguration.PaymentRateLimitPolicy)
+            .WithName("PayBooking")
+            .WithSummary("Pay for an unpaid booking with a test payment token (simulated; nothing is charged).")
+            .WithDescription("Tokens: sim_success, sim_declined, sim_insufficient_funds. Requires an Idempotency-Key header. " +
+                             "A declined payment is a normal result (status Failed) and the booking stays payable until its " +
+                             "hold expires; retry with a new key. Repeating a key returns the recorded outcome (200).")
+            .Produces<PaymentResultDto>(StatusCodes.Status201Created)
+            .Produces<PaymentResultDto>()
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
         bookings.MapGet("/{reference}/cancellation", (string reference, BookingService service, CancellationToken ct) =>
                 service.GetCancellationQuoteAsync(reference, ct))

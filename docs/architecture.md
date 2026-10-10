@@ -52,6 +52,26 @@ Dependencies point inward: `Api → Application → Domain`, and `Infrastructure
 | PUT | `/{reference}/segments/{segmentId}/seats` | Replaces the listed passengers' seats on that flight; `409 seat_unavailable` / `booking_expired`, `422 seat_not_found` / `passenger_not_in_booking` |
 | GET | `/{reference}/cancellation` | Whether cancelling is allowed now and the refund it would give |
 | POST | `/{reference}/cancel` | Cancels, releases seats and capacity, records the (simulated) refund |
+| POST | `/{reference}/payments` | Body `{ "paymentToken": "sim_success" }`, requires `Idempotency-Key`, rate limited per user. `201` with the attempt and the updated booking (a decline is also `201` with `status: Failed` and a `failureCode`), `200` for a replay, `409 booking_expired` / `booking_not_payable` / `payment_in_progress`, `422 idempotency_key_reused` |
+
+### Payment flow (`PaymentService`)
+1. **Claim.** Record a `Pending` attempt and stamp `Booking.LastPaymentStartedAt`. That bumps the booking's `xmin`, so a
+   concurrent payment, seat change, cancellation or expiry of the same booking loses with a concurrency conflict.
+2. **Charge.** Call `IPaymentGateway` outside any transaction and no longer cancellable by the client.
+3. **Record.** Mark the attempt `Succeeded` (confirming the booking and its seats) or `Failed` (booking stays payable).
+
+While an attempt is `Pending` and younger than `Booking.PaymentTimeout` (2 min), the hold cannot expire and the booking
+cannot be changed or cancelled (`409 payment_in_progress`). An older pending attempt is treated as abandoned: it is marked
+`Failed` (`payment_timeout`) by the next payment, cancellation or expiry.
+
+### Background jobs (`Infrastructure/Jobs`, `BackgroundJobs` settings)
+| Job | Default interval | Work |
+|-----|------------------|------|
+| `BookingExpiryJob` | 1 min | Expires lapsed holds in batches of 200 (requests also do this lazily per flight) |
+| `FlightHorizonJob` | 6 h | Generates flights up to `FlightData:HorizonDays` ahead so the bookable window rolls forward |
+
+Both run once at start-up and are idempotent, so running several API instances is safe (conflicts are ignored).
+`BackgroundJobs:Enabled=false` turns them off (tests run them explicitly).
 
 ## Domain model
 
@@ -123,8 +143,9 @@ Payment attempts go `Pending → Succeeded | Failed`. A succeeded payment can th
 | The same seat sold twice | A partial unique index on active seat reservations. A violation (`23505`) maps to `409 seat_unavailable`. Before seats are assigned or a booking is created, lapsed holds on the affected flights are expired (lazy expiry, below). |
 | Payment racing the hold expiry | `Booking` uses PostgreSQL `xmin` as an optimistic concurrency token. The losing transaction gets a `DbUpdateConcurrencyException`, which maps to `409`. |
 | Duplicate bookings from retries | The `Idempotency-Key` header is required. There is a unique `(user_id, idempotency_key)` index plus a request hash: the same key with the same body returns the original booking, and the same key with a different body returns `422`. |
-| Lapsed holds still blocking seats | **Lazy expiry**: booking creation, seat selection and cancellation first expire due `PendingPayment` bookings on the affected flights, each in its own short transaction (a concurrency conflict means another request got there first and is ignored). Reads report a lapsed hold as `Expired` even before it is persisted. A background job (M12) sweeps the rest. |
-| Duplicate payments | `Idempotency-Key` with a unique `(booking_id, idempotency_key)` index. A booking can only be confirmed once. |
+| Lapsed holds still blocking seats | **Lazy expiry**: booking creation, seat selection and cancellation first expire due `PendingPayment` bookings on the affected flights, each in its own short transaction (a concurrency conflict means another request got there first and is ignored). Reads report a lapsed hold as `Expired` even before it is persisted. `BookingExpiryJob` sweeps the rest every minute. |
+| Duplicate payments | `Idempotency-Key` with a unique `(booking_id, idempotency_key)` index and a request hash. Starting a payment bumps the booking version, so parallel attempts with different keys get `409 payment_in_progress` and only one can charge. A booking can only be confirmed once. |
+| Hold expiring during a charge | A pending attempt younger than `Booking.PaymentTimeout` keeps the hold alive (the expiry query and `IsHoldExpired` skip it). If a charge somehow outlives that window and the booking changed, recording fails, the client gets `409 payment_timeout` and an error is logged for a refund. |
 
 ## Time handling
 - Persisted instants are `timestamptz` (`DateTimeOffset` in UTC).
@@ -149,7 +170,7 @@ Payment attempts go `Pending → Succeeded | Failed`. A succeeded payment can th
   session. The mobile client therefore refreshes single-flight.
 - Every booking query is filtered by the authenticated user's ID. Another user's booking returns `404` (no IDOR, no existence leak).
 - Prices, totals, status and seat availability are always computed on the server.
-- Rate limiting (fixed window per client IP, `RateLimiting` settings, `429 rate_limited` with `Retry-After`) covers auth and payment endpoints. Behind a proxy, forwarded headers must be configured so the real client IP is used (see deployment docs). Request logging never includes bodies or the `Authorization` header.
+- Rate limiting (fixed window, `RateLimiting` settings, `429 rate_limited` with `Retry-After`) covers auth endpoints per client IP and payments per signed-in user. Behind a proxy, forwarded headers must be configured so the real client IP is used (see deployment docs). Request logging never includes bodies or the `Authorization` header.
 - Production returns Problem Details without stack traces. Secrets come from environment variables or user-secrets.
 
 ## Mobile architecture

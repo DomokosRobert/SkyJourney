@@ -90,6 +90,7 @@ public sealed class BookingService(ISkyJourneyDbContext db, ICurrentUser current
         var userId = currentUser.UserId;
         var now = time.GetUtcNow();
         var mine = db.Bookings.AsNoTracking().Where(b => b.UserId == userId);
+        var paymentStartedAfter = now - Booking.PaymentTimeout;
 
         var total = await mine.CountAsync(cancellationToken);
         var rows = await mine
@@ -102,6 +103,7 @@ public sealed class BookingService(ISkyJourneyDbContext db, ICurrentUser current
                 b.Status,
                 b.CreatedAt,
                 b.ExpiresAt,
+                PaymentInFlight = b.Payments.Any(p => p.Status == PaymentStatus.Pending && p.CreatedAt > paymentStartedAfter),
                 b.TotalPrice.Amount,
                 b.TotalPrice.Currency,
                 PassengerCount = b.Passengers.Count,
@@ -115,7 +117,7 @@ public sealed class BookingService(ISkyJourneyDbContext db, ICurrentUser current
         {
             var outbound = r.Segments[0];
             var inbound = r.Segments.Count > 1 ? r.Segments[1] : null;
-            var status = EffectiveStatus(r.Status, r.ExpiresAt, now);
+            var status = EffectiveStatus(r.Status, r.ExpiresAt, r.PaymentInFlight, now);
             var lastDeparture = inbound?.DepartureUtc ?? outbound.DepartureUtc;
             return new BookingSummaryDto(
                 r.Id,
@@ -286,9 +288,12 @@ public sealed class BookingService(ISkyJourneyDbContext db, ICurrentUser current
     internal static string ComputeRequestHash(CreateBookingRequest request) =>
         Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(request)));
 
-    /// <summary>A lapsed hold reads as expired immediately, even before the expiry job has processed it.</summary>
-    internal static BookingStatus EffectiveStatus(BookingStatus status, DateTimeOffset expiresAt, DateTimeOffset now) =>
-        status == BookingStatus.PendingPayment && now >= expiresAt ? BookingStatus.Expired : status;
+    /// <summary>
+    /// A lapsed hold reads as expired immediately, even before the expiry job has processed it, unless a payment
+    /// that started in time is still running (mirrors <see cref="Booking.IsHoldExpired"/> for projections).
+    /// </summary>
+    internal static BookingStatus EffectiveStatus(BookingStatus status, DateTimeOffset expiresAt, bool paymentInFlight, DateTimeOffset now) =>
+        status == BookingStatus.PendingPayment && now >= expiresAt && !paymentInFlight ? BookingStatus.Expired : status;
 
     private async Task<BookingDto?> FindReplayAsync(Guid userId, string idempotencyKey, string requestHash,
         CancellationToken cancellationToken)
@@ -345,7 +350,7 @@ public sealed class BookingService(ISkyJourneyDbContext db, ICurrentUser current
 
     internal static BookingDto ToDto(Booking booking, DateTimeOffset now)
     {
-        var status = EffectiveStatus(booking.Status, booking.ExpiresAt, now);
+        var status = booking.IsHoldExpired(now) ? BookingStatus.Expired : booking.Status;
         return new BookingDto(
             booking.Id,
             booking.Reference,

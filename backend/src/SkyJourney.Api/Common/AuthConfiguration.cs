@@ -17,12 +17,18 @@ public sealed class RateLimitingOptions
     public int AuthPermitLimit { get; init; } = 10;
 
     public int AuthWindowSeconds { get; init; } = 60;
+
+    /// <summary>Payment requests per signed-in user and window.</summary>
+    public int PaymentPermitLimit { get; init; } = 20;
+
+    public int PaymentWindowSeconds { get; init; } = 60;
 }
 
 public static class AuthConfiguration
 {
     public const string AdminPolicy = "Admin";
     public const string AuthRateLimitPolicy = "auth";
+    public const string PaymentRateLimitPolicy = "payments";
 
     public static IServiceCollection AddApiAuthentication(this IServiceCollection services, IConfiguration configuration)
     {
@@ -71,6 +77,20 @@ public static class AuthConfiguration
                     {
                         PermitLimit = settings.AuthPermitLimit,
                         Window = TimeSpan.FromSeconds(settings.AuthWindowSeconds),
+                        QueueLimit = 0,
+                    });
+            });
+            options.AddPolicy(PaymentRateLimitPolicy, context =>
+            {
+                var settings = context.RequestServices.GetRequiredService<IOptions<RateLimitingOptions>>().Value;
+                // Runs after authentication, so the user id is known; fall back to the IP just in case.
+                var partition = context.User.FindFirst("sub")?.Value ?? context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    partition,
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = settings.PaymentPermitLimit,
+                        Window = TimeSpan.FromSeconds(settings.PaymentWindowSeconds),
                         QueueLimit = 0,
                     });
             });

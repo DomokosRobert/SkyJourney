@@ -7,8 +7,11 @@ using Microsoft.Extensions.Options;
 using SkyJourney.Application.Auth;
 using SkyJourney.Application.Common;
 using SkyJourney.Application.FlightData;
+using SkyJourney.Application.Payments;
 using SkyJourney.Infrastructure.FlightData;
 using SkyJourney.Infrastructure.Identity;
+using SkyJourney.Infrastructure.Jobs;
+using SkyJourney.Infrastructure.Payments;
 using SkyJourney.Infrastructure.Persistence;
 
 namespace SkyJourney.Infrastructure;
@@ -29,6 +32,13 @@ public static class DependencyInjection
         services.AddScoped<ISkyJourneyDbContext>(sp => sp.GetRequiredService<SkyJourneyDbContext>());
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<IFlightDataProvider, DeterministicFlightDataProvider>();
+        services.Configure<FlightDataOptions>(configuration.GetSection(FlightDataOptions.SectionName));
+
+        services.AddSingleton<IPaymentGateway, SimulatedPaymentGateway>();
+
+        services.Configure<BackgroundJobOptions>(configuration.GetSection(BackgroundJobOptions.SectionName));
+        services.AddHostedService<BookingExpiryJob>();
+        services.AddHostedService<FlightHorizonJob>();
         return services;
     }
 

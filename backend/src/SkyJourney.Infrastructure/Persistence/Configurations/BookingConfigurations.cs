@@ -97,6 +97,7 @@ internal sealed class PaymentAttemptConfiguration : IEntityTypeConfiguration<Pay
         builder.ComplexProperty(p => p.Amount, m => m.ConfigureMoney());
         builder.ComplexProperty(p => p.RefundedAmount, m => m.ConfigureMoney());
         builder.Property(p => p.IdempotencyKey).HasMaxLength(64);
+        builder.Property(p => p.RequestHash).HasMaxLength(64);
         builder.Property(p => p.Provider).HasMaxLength(32);
         builder.Property(p => p.ProviderReference).HasMaxLength(64);
         builder.Property(p => p.FailureCode).HasMaxLength(64);

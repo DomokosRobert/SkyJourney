@@ -276,7 +276,7 @@ public sealed class BookingTests(SkyJourneyApiFactory factory)
         var client = await factory.CreateUserClientAsync();
         var booking = await client.CreateBookingAsync(BookingTestHelpers.Request(flight.Id, FareFamily.Plus));
         var withSeat = await (await client.PutSeatsAsync(booking, 0, (booking.Passengers[0].Id, "20A"))).ReadAsAsync<BookingDto>();
-        await factory.ConfirmAsync(booking.Reference);
+        await client.ConfirmAsync(booking);
 
         var response = await client.PostAsync($"/api/v1/bookings/{booking.Reference}/cancel", null, Ct);
 
@@ -299,7 +299,7 @@ public sealed class BookingTests(SkyJourneyApiFactory factory)
         var flight = await factory.FindFlightAsync("BUD", "HEL", new DateOnly(2026, 11, 2));
         var client = await factory.CreateUserClientAsync();
         var booking = await client.CreateBookingAsync(BookingTestHelpers.Request(flight.Id, FareFamily.Flex));
-        await factory.ConfirmAsync(booking.Reference);
+        await client.ConfirmAsync(booking);
 
         var quote = (await client.GetFromJsonAsync<CancellationQuoteDto>($"/api/v1/bookings/{booking.Reference}/cancellation",
             SkyJourneyApiFactory.Json, Ct))!;

@@ -9,11 +9,12 @@ public sealed class PaymentAttempt : Entity
     {
     }
 
-    internal PaymentAttempt(Guid bookingId, Money amount, string idempotencyKey, string provider, DateTimeOffset now)
+    internal PaymentAttempt(Guid bookingId, Money amount, string idempotencyKey, string requestHash, string provider, DateTimeOffset now)
     {
         BookingId = bookingId;
         Amount = amount;
         IdempotencyKey = idempotencyKey;
+        RequestHash = requestHash;
         Provider = provider;
         Status = PaymentStatus.Pending;
         RefundedAmount = Money.Zero(amount.Currency);
@@ -29,6 +30,9 @@ public sealed class PaymentAttempt : Entity
     public PaymentStatus Status { get; private set; }
 
     public string IdempotencyKey { get; private set; } = null!;
+
+    /// <summary>Hash of the payment request; detects an idempotency key reused for a different request.</summary>
+    public string RequestHash { get; private set; } = null!;
 
     public string Provider { get; private set; } = null!;
 

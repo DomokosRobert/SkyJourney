@@ -4,6 +4,7 @@ using SkyJourney.Application.Airports;
 using SkyJourney.Application.Bookings;
 using SkyJourney.Application.FlightData;
 using SkyJourney.Application.Flights;
+using SkyJourney.Application.Payments;
 
 namespace SkyJourney.Application;
 
@@ -18,6 +19,7 @@ public static class DependencyInjection
         services.AddScoped<FlightDataImporter>();
         services.AddScoped<BookingService>();
         services.AddScoped<BookingExpiryService>();
+        services.AddScoped<PaymentService>();
         return services;
     }
 }

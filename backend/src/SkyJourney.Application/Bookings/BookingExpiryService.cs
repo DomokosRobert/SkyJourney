@@ -21,8 +21,10 @@ public sealed class BookingExpiryService(ISkyJourneyDbContext db, TimeProvider t
     public async Task<int> ExpireDueAsync(IReadOnlyCollection<Guid>? flightIds, int maxBookings, CancellationToken cancellationToken)
     {
         var now = time.GetUtcNow();
+        var paymentStartedAfter = now - Booking.PaymentTimeout;
         var due = db.Bookings.AsNoTracking()
-            .Where(b => b.Status == BookingStatus.PendingPayment && b.ExpiresAt <= now);
+            .Where(b => b.Status == BookingStatus.PendingPayment && b.ExpiresAt <= now)
+            .Where(b => !b.Payments.Any(p => p.Status == PaymentStatus.Pending && p.CreatedAt > paymentStartedAfter));
         if (flightIds is not null)
         {
             due = due.Where(b => b.Segments.Any(s => flightIds.Contains(s.FlightId)));
@@ -50,6 +52,7 @@ public sealed class BookingExpiryService(ISkyJourneyDbContext db, TimeProvider t
             var booking = await db.Bookings
                 .Include(b => b.Passengers)
                 .Include(b => b.Segments).ThenInclude(s => s.SeatReservations)
+                .Include(b => b.Payments)
                 .AsSplitQuery()
                 .SingleOrDefaultAsync(b => b.Id == bookingId, cancellationToken);
 

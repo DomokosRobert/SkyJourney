@@ -4,8 +4,10 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using SkyJourney.Application.Auth;
 using SkyJourney.Application.Bookings;
+using SkyJourney.Application.Payments;
 using SkyJourney.Domain.Bookings;
 using SkyJourney.Domain.Flights;
+using SkyJourney.Infrastructure.Payments;
 using SkyJourney.IntegrationTests.Infrastructure;
 
 namespace SkyJourney.IntegrationTests.Bookings;
@@ -74,18 +76,24 @@ internal static class BookingTestHelpers
             new SelectSeatsRequest(seats.Select(s => new SeatAssignmentRequest(s.PassengerId, s.SeatNumber)).ToList()),
             SkyJourneyApiFactory.Json, Ct);
 
-    /// <summary>Pays for a booking directly through the domain model (the payment API arrives in a later milestone).</summary>
-    public static Task ConfirmAsync(this SkyJourneyApiFactory factory, string reference) =>
-        factory.WithDbAsync(async db =>
+    public static async Task<HttpResponseMessage> PayAsync(this HttpClient client, BookingDto booking,
+        string paymentToken = SimulatedPaymentGateway.SuccessToken, string? idempotencyKey = null)
+    {
+        using var message = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/bookings/{booking.Reference}/payments")
         {
-            var booking = await db.Bookings
-                .Include(b => b.Passengers)
-                .Include(b => b.Payments)
-                .Include(b => b.Segments).ThenInclude(s => s.SeatReservations)
-                .SingleAsync(b => b.Reference == reference, Ct);
-            var now = factory.Clock.GetUtcNow();
-            var attempt = booking.StartPayment(Guid.NewGuid().ToString(), "test", now);
-            booking.CompletePayment(attempt, succeeded: true, "test-ref", null, now);
-            await db.SaveChangesAsync(Ct);
-        });
+            Content = JsonContent.Create(new PayBookingRequest(paymentToken), options: SkyJourneyApiFactory.Json),
+        };
+        message.Headers.Add(IdempotencyKey.HeaderName, idempotencyKey ?? Guid.NewGuid().ToString());
+        return await client.SendAsync(message, Ct);
+    }
+
+    /// <summary>Pays with the success token through the API and asserts the booking is confirmed.</summary>
+    public static async Task<PaymentResultDto> ConfirmAsync(this HttpClient client, BookingDto booking)
+    {
+        var response = await client.PayAsync(booking);
+        Assert.Equal(System.Net.HttpStatusCode.Created, response.StatusCode);
+        var payment = await response.ReadAsAsync<PaymentResultDto>();
+        Assert.Equal(BookingStatus.Confirmed, payment.Booking.Status);
+        return payment;
+    }
 }

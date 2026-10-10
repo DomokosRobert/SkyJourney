@@ -158,7 +158,7 @@ public sealed class BookingTests
         var booking = TestData.Booking(outbound);
         booking.HoldSeats(booking.Segments.Single().Id, [new SeatSelection(booking.Passengers.Single(), outbound.AircraftType.Seats.First())], Now);
 
-        var attempt = booking.StartPayment("pay-1", "Simulated", Now);
+        var attempt = booking.StartPayment("pay-1", "hash", "Simulated", Now);
         booking.CompletePayment(attempt, succeeded: true, "sim_123", null, Now.AddMinutes(1));
 
         Assert.Equal(BookingStatus.Confirmed, booking.Status);
@@ -173,9 +173,9 @@ public sealed class BookingTests
         var (outbound, _) = TestData.RoundTrip();
         var booking = TestData.Booking(outbound);
 
-        var failed = booking.StartPayment("pay-1", "Simulated", Now);
+        var failed = booking.StartPayment("pay-1", "hash", "Simulated", Now);
         booking.CompletePayment(failed, succeeded: false, null, "card_declined", Now);
-        var retry = booking.StartPayment("pay-2", "Simulated", Now);
+        var retry = booking.StartPayment("pay-2", "hash", "Simulated", Now);
 
         Assert.Equal(PaymentStatus.Failed, failed.Status);
         Assert.Equal(BookingStatus.PendingPayment, booking.Status);
@@ -188,8 +188,62 @@ public sealed class BookingTests
         var (outbound, _) = TestData.RoundTrip();
         var booking = TestData.Booking(outbound);
 
-        var ex = Assert.Throws<DomainException>(() => booking.StartPayment("p", "Simulated", booking.ExpiresAt));
+        var ex = Assert.Throws<DomainException>(() => booking.StartPayment("p", "hash", "Simulated", booking.ExpiresAt));
         Assert.Equal("booking_expired", ex.Code);
+    }
+
+    [Fact]
+    public void A_payment_in_flight_blocks_other_payments_cancellation_and_seat_changes()
+    {
+        var (outbound, _) = TestData.RoundTrip();
+        var booking = TestData.Booking(outbound);
+        var segmentId = booking.Segments.Single().Id;
+        booking.StartPayment("pay-1", "hash", "Simulated", Now);
+
+        Assert.Equal("payment_in_progress", Assert.Throws<DomainException>(() => booking.StartPayment("pay-2", "hash", "Simulated", Now)).Code);
+        Assert.Equal("payment_in_progress", Assert.Throws<DomainException>(() => booking.Cancel(BookingActor.Customer, "x", Now)).Code);
+        Assert.Equal("payment_in_progress", Assert.Throws<DomainException>(() => booking.ReleaseSeats(segmentId, [], Now)).Code);
+        Assert.NotNull(booking.LastPaymentStartedAt);
+    }
+
+    [Fact]
+    public void A_payment_started_in_time_keeps_the_hold_until_it_times_out()
+    {
+        var (outbound, _) = TestData.RoundTrip();
+        var booking = TestData.Booking(outbound);
+        var attempt = booking.StartPayment("pay-1", "hash", "Simulated", booking.ExpiresAt.AddSeconds(-1));
+
+        Assert.False(booking.IsHoldExpired(booking.ExpiresAt.AddSeconds(30)));
+        booking.CompletePayment(attempt, succeeded: true, "sim_ref", null, booking.ExpiresAt.AddSeconds(30));
+        Assert.Equal(BookingStatus.Confirmed, booking.Status);
+    }
+
+    [Fact]
+    public void An_abandoned_payment_times_out_and_fails_when_the_booking_expires()
+    {
+        var (outbound, _) = TestData.RoundTrip();
+        var booking = TestData.Booking(outbound);
+        var attempt = booking.StartPayment("pay-1", "hash", "Simulated", booking.ExpiresAt.AddSeconds(-1));
+        var later = booking.ExpiresAt + Booking.PaymentTimeout;
+
+        Assert.True(booking.IsHoldExpired(later));
+        booking.Expire(later);
+
+        Assert.Equal(PaymentStatus.Failed, attempt.Status);
+        Assert.Equal("payment_timeout", attempt.FailureCode);
+    }
+
+    [Fact]
+    public void A_timed_out_attempt_does_not_block_a_new_payment()
+    {
+        var (outbound, _) = TestData.RoundTrip();
+        var booking = TestData.Booking(outbound);
+        var stale = booking.StartPayment("pay-1", "hash", "Simulated", Now);
+
+        var retry = booking.StartPayment("pay-2", "hash", "Simulated", Now + Booking.PaymentTimeout);
+
+        Assert.Equal(PaymentStatus.Failed, stale.Status);
+        Assert.Equal(PaymentStatus.Pending, retry.Status);
     }
 
     [Fact]
@@ -284,7 +338,7 @@ public sealed class BookingTests
     private static Booking ConfirmedBooking(Flight outbound, Flight? inbound, FareFamily family)
     {
         var booking = TestData.Booking(outbound, inbound, family, adults: 2);
-        var attempt = booking.StartPayment("pay", "Simulated", Now);
+        var attempt = booking.StartPayment("pay", "hash", "Simulated", Now);
         booking.CompletePayment(attempt, true, "sim_ref", null, Now);
         return booking;
     }

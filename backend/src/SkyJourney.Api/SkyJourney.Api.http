@@ -79,6 +79,14 @@ Content-Type: application/json
 
 { "seats": [ { "passengerId": "{{booking.response.body.passengers[0].id}}", "seatNumber": "12C" } ] }
 
+### Pay with a simulated test token: sim_success, sim_declined or sim_insufficient_funds (never a card number)
+POST {{baseUrl}}/api/v1/bookings/{{booking.response.body.reference}}/payments
+Authorization: Bearer {{login.response.body.accessToken}}
+Content-Type: application/json
+Idempotency-Key: {{$random.uuid}}
+
+{ "paymentToken": "sim_success" }
+
 ### Cancellation quote
 GET {{baseUrl}}/api/v1/bookings/{{booking.response.body.reference}}/cancellation
 Authorization: Bearer {{login.response.body.accessToken}}

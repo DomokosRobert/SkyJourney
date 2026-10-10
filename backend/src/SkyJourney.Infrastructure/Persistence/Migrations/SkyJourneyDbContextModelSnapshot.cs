@@ -188,7 +188,6 @@ namespace SkyJourney.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("SkyJourney.Domain.Airports.Airport", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -249,7 +248,6 @@ namespace SkyJourney.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("SkyJourney.Domain.Bookings.Booking", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -274,6 +272,10 @@ namespace SkyJourney.Infrastructure.Persistence.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)")
                         .HasColumnName("idempotency_key");
+
+                    b.Property<DateTimeOffset?>("LastPaymentStartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_payment_started_at");
 
                     b.Property<string>("Reference")
                         .IsRequired()
@@ -361,7 +363,6 @@ namespace SkyJourney.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("SkyJourney.Domain.Bookings.BookingPassenger", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -404,7 +405,6 @@ namespace SkyJourney.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("SkyJourney.Domain.Bookings.BookingSegment", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -482,7 +482,6 @@ namespace SkyJourney.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("SkyJourney.Domain.Bookings.BookingStatusHistory", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -528,7 +527,6 @@ namespace SkyJourney.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("SkyJourney.Domain.Bookings.PaymentAttempt", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -565,6 +563,12 @@ namespace SkyJourney.Infrastructure.Persistence.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)")
                         .HasColumnName("provider_reference");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("request_hash");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -624,7 +628,6 @@ namespace SkyJourney.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("SkyJourney.Domain.Bookings.SeatReservation", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -702,7 +705,6 @@ namespace SkyJourney.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("SkyJourney.Domain.Fleet.AircraftSeat", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -746,7 +748,6 @@ namespace SkyJourney.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("SkyJourney.Domain.Fleet.AircraftType", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -785,7 +786,6 @@ namespace SkyJourney.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("SkyJourney.Domain.Fleet.Airline", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -815,7 +815,6 @@ namespace SkyJourney.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("SkyJourney.Domain.Flights.Fare", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -884,7 +883,6 @@ namespace SkyJourney.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("SkyJourney.Domain.Flights.Flight", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -975,7 +973,6 @@ namespace SkyJourney.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("SkyJourney.Domain.Flights.FlightSchedule", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 

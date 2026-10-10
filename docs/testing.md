@@ -33,7 +33,13 @@ Both test projects use **xUnit v3 on Microsoft Testing Platform**. `backend/glob
   6 users racing for one seat (exactly 1 succeeds), 8 retries with one idempotency key (one booking).
   The hold-expiry test uses its own clock and signs in again after advancing it, because the hold (20 min) outlives the
   access token (15 min).
-- The shared host raises the auth rate limit, because every in-memory request comes from the same "client IP".
+- Payment tests (`PaymentTests`) cover outcomes per test token, replay and key reuse, 8 parallel payments with different
+  keys (exactly one charge), 6 parallel retries with one key (one attempt), paying after the hold lapsed (own clock), and
+  the per-user payment rate limit (own host with a limit of 2).
+- Background jobs are disabled in tests (`BackgroundJobs:Enabled=false`). `JobTests` resolves the job from the host's
+  hosted services and calls `RunOnceAsync`. The expiry test moves only its own booking's `expires_at` into the past, so the
+  shared clock stays frozen; the horizon test uses its own clock one day ahead and checks flights appear on day 22 only.
+- The shared host raises the auth and payment rate limits, because every in-memory request comes from the same "client IP".
 
 ### Mobile
 

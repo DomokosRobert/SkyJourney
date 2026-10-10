@@ -203,3 +203,30 @@ is filled in by the next commit (or listed in the final report).
     means another request already handled it.
   - The hold (20 min) outlives the access token (15 min); clients refresh transparently, the expiry test signs in again.
   - The payment API is not part of this milestone; tests confirm bookings through the domain model until M12.
+
+## M12 — `feat(payments): implement simulated checkout`
+- **Previous commit:** M11 = `9685041`.
+- **Content:** `POST /api/v1/bookings/{reference}/payments` with a required `Idempotency-Key` (request hash, replay with
+  `Idempotent-Replayed`, `422` on key reuse) and a per-user rate limit. `PaymentService` runs a two-phase flow: it saves a
+  `Pending` attempt (bumping the booking version via `LastPaymentStartedAt`), charges `IPaymentGateway` outside any
+  transaction, then records the outcome. `SimulatedPaymentGateway` accepts only test tokens (`sim_success`,
+  `sim_declined`, `sim_insufficient_funds`; anything else → `invalid_payment_token`); no card data exists anywhere.
+  A pending attempt younger than `Booking.PaymentTimeout` (2 min) keeps the hold alive and blocks seat changes and
+  cancellation (`409 payment_in_progress`); older ones are failed as `payment_timeout`. Recurring jobs
+  (`BookingExpiryJob` every minute, `FlightHorizonJob` every 6 h, `BackgroundJobs` settings) sweep lapsed holds and roll
+  the flight horizon forward. Migration `AddPaymentIdempotencyAndClaim` adds `payment_attempts.request_hash` and
+  `bookings.last_payment_started_at`.
+- **Validation:** ✅ `dotnet build` (0 warnings); ✅ `dotnet format --verify-no-changes`; ✅ `dotnet test` 199/199
+  (128 unit, incl. payment-in-flight domain rules, token validation, request hash and the simulated gateway; 71
+  integration, incl. 7 payment tests: success with seat confirmation and replay/key reuse/second payment/seat change
+  rejected, the three decline codes then success, 8 parallel payments with different keys → exactly one charge, 6
+  parallel retries with one key → one attempt, payment after the hold lapsed → `409 booking_expired` with capacity
+  released, validation/IDOR/anonymous, rate limit → `429`; and 2 job tests: expiry sweep and horizon rollover);
+  `has-pending-model-changes` reports none. Manually against the dev API (migration applied on start-up): booking →
+  `sim_declined` (201 Failed, booking still PendingPayment) → `sim_success` (201 Succeeded, Confirmed) → replay (200,
+  `Idempotent-Replayed: true`, same payment id) → new key (409 `booking_not_payable`); both jobs ran at start-up.
+- **Decisions:**
+  - Declines are `201` with `status: Failed`: the attempt was created and is a business outcome, not a client error.
+  - The charge is not cancellable once started (`CancellationToken.None`), so a disconnecting client cannot leave
+    money taken without a recorded outcome.
+  - Jobs are disabled in tests and invoked through `RunOnceAsync`, so they never race with assertions.

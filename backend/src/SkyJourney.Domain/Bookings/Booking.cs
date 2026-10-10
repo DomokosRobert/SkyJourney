@@ -27,6 +27,12 @@ public sealed class Booking : Entity
     /// <summary>Minimum time between outbound arrival and return departure.</summary>
     public static readonly TimeSpan MinimumStay = TimeSpan.FromHours(2);
 
+    /// <summary>
+    /// How long a started payment keeps the booking alive past its hold and blocks changes and other payments.
+    /// An attempt still pending after this is treated as abandoned.
+    /// </summary>
+    public static readonly TimeSpan PaymentTimeout = TimeSpan.FromMinutes(2);
+
     private static readonly Dictionary<BookingStatus, BookingStatus[]> AllowedTransitions = new()
     {
         [BookingStatus.PendingPayment] = [BookingStatus.Confirmed, BookingStatus.Expired, BookingStatus.Cancelled],
@@ -68,6 +74,12 @@ public sealed class Booking : Entity
     /// <summary>Hash of the creation request; detects an idempotency key reused for a different request.</summary>
     public string RequestHash { get; private set; } = null!;
 
+    /// <summary>
+    /// When the latest payment attempt started. Writing it on every attempt makes payment starts conflict (via
+    /// <see cref="Version"/>) with concurrent payments, cancellations, seat changes and expiry of the same booking.
+    /// </summary>
+    public DateTimeOffset? LastPaymentStartedAt { get; private set; }
+
     /// <summary>Optimistic concurrency token (PostgreSQL <c>xmin</c>).</summary>
     public uint Version { get; private set; }
 
@@ -83,7 +95,13 @@ public sealed class Booking : Entity
 
     public DateTimeOffset FirstDepartureUtc => _segments.Min(s => s.Flight.DepartureUtc);
 
-    public bool IsHoldExpired(DateTimeOffset now) => Status == BookingStatus.PendingPayment && now >= ExpiresAt;
+    /// <summary>True when an unpaid booking's hold has lapsed and no payment that started in time is still running.</summary>
+    public bool IsHoldExpired(DateTimeOffset now) =>
+        Status == BookingStatus.PendingPayment && now >= ExpiresAt && !HasPaymentInFlight(now);
+
+    /// <summary>A payment attempt has started and has neither completed nor timed out.</summary>
+    public bool HasPaymentInFlight(DateTimeOffset now) =>
+        _payments.Any(p => p.Status == PaymentStatus.Pending && now < p.CreatedAt + PaymentTimeout);
 
     public static Booking Create(Guid userId, string reference, IReadOnlyList<SegmentSelection> segments,
         IReadOnlyList<PassengerDetails> passengers, string idempotencyKey, string requestHash, DateTimeOffset now)
@@ -170,7 +188,7 @@ public sealed class Booking : Entity
         RecalculateTotal();
     }
 
-    public PaymentAttempt StartPayment(string idempotencyKey, string provider, DateTimeOffset now)
+    public PaymentAttempt StartPayment(string idempotencyKey, string requestHash, string provider, DateTimeOffset now)
     {
         if (Status != BookingStatus.PendingPayment)
         {
@@ -182,13 +200,12 @@ public sealed class Booking : Entity
             throw new DomainException("booking_expired", "The booking hold has expired. Please search again.");
         }
 
-        if (_payments.Any(p => p.Status == PaymentStatus.Pending))
-        {
-            throw new DomainException("payment_in_progress", "Another payment for this booking is in progress.");
-        }
+        EnsureNoPaymentInFlight(now);
+        FailAbandonedPayments(now);
 
-        var attempt = new PaymentAttempt(Id, TotalPrice, idempotencyKey, provider, now);
+        var attempt = new PaymentAttempt(Id, TotalPrice, idempotencyKey, requestHash, provider, now);
         _payments.Add(attempt);
+        LastPaymentStartedAt = now;
         return attempt;
     }
 
@@ -222,6 +239,7 @@ public sealed class Booking : Entity
             throw new DomainException("booking_not_expirable", "Only unpaid bookings past their hold time can expire.");
         }
 
+        FailAbandonedPayments(now);
         ReleaseAllSeats();
         TransitionTo(BookingStatus.Expired, BookingActor.System, "Payment hold expired", now);
     }
@@ -233,6 +251,7 @@ public sealed class Booking : Entity
         switch (Status)
         {
             case BookingStatus.PendingPayment:
+                EnsureNoPaymentInFlight(now);
                 return Money.Zero(currency);
             case BookingStatus.Confirmed when actor == BookingActor.Administrator:
                 return TotalPrice;
@@ -272,6 +291,7 @@ public sealed class Booking : Entity
 
         RefundedAmount = refund;
         CancelledAt = now;
+        FailAbandonedPayments(now);
         ReleaseAllSeats();
         TransitionTo(BookingStatus.Cancelled, actor, reason, now);
         return refund;
@@ -317,12 +337,30 @@ public sealed class Booking : Entity
         _segments.SingleOrDefault(s => s.Id == segmentId)
         ?? throw new DomainException("segment_not_found", "The segment does not belong to this booking.");
 
+    private void EnsureNoPaymentInFlight(DateTimeOffset now)
+    {
+        if (HasPaymentInFlight(now))
+        {
+            throw new DomainException("payment_in_progress", "A payment for this booking is in progress. Try again shortly.");
+        }
+    }
+
+    private void FailAbandonedPayments(DateTimeOffset now)
+    {
+        foreach (var attempt in _payments.Where(p => p.Status == PaymentStatus.Pending))
+        {
+            attempt.MarkFailed("payment_timeout", null, now);
+        }
+    }
+
     private void EnsureSeatsChangeable(DateTimeOffset now)
     {
         if (Status != BookingStatus.PendingPayment)
         {
             throw new DomainException("seats_locked", "Seats can only be changed before payment.");
         }
+
+        EnsureNoPaymentInFlight(now);
 
         if (IsHoldExpired(now))
         {
