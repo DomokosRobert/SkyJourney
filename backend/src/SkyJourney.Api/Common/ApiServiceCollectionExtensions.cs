@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http.Json;
+using Microsoft.AspNetCore.HttpOverrides;
 using SkyJourney.Infrastructure.Persistence;
 
 namespace SkyJourney.Api.Common;
@@ -35,6 +36,18 @@ public static class ApiServiceCollectionExtensions
             .AddDbContextCheck<SkyJourneyDbContext>("database", tags: ["ready"]);
 
         services.AddApiAuthentication(configuration);
+
+        // Behind a hosting platform's load balancer the connection's address is the proxy's, which would put every
+        // client in one rate-limit partition. Enable only when the container is reachable solely through that proxy:
+        // the X-Forwarded-For header is trusted from any address (one hop), so a directly reachable API could be
+        // given a spoofed client address.
+        services.Configure<ForwardedHeadersOptions>(options =>
+        {
+            options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+            options.ForwardLimit = 1;
+            options.KnownIPNetworks.Clear();
+            options.KnownProxies.Clear();
+        });
 
         services.AddOpenApi("v1", options =>
         {

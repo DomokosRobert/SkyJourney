@@ -41,6 +41,11 @@ try
             "Access tokens become invalid on restart (clients recover through refresh).");
     }
 
+    if (app.Configuration.GetValue<bool>("ForwardedHeaders:Enabled"))
+    {
+        app.UseForwardedHeaders();
+    }
+
     // Correlation and request logging wrap the exception handler, so every log line (including the
     // handler's) carries the correlation id and the request log records the final status code.
     app.UseMiddleware<CorrelationIdMiddleware>();

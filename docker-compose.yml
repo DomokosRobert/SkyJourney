@@ -1,6 +1,8 @@
 # Local development infrastructure.
-#   docker compose up -d            -> PostgreSQL only (run the API from Rider / dotnet run)
-#   docker compose --profile api up -d --build  -> PostgreSQL + containerised API
+#   docker compose up -d                          -> PostgreSQL only (run the API with dotnet run / an IDE)
+#   docker compose --profile api up -d --build    -> PostgreSQL + migrations (release step) + containerised API
+#                                                    on http://localhost:${API_PORT:-8080}
+# Values come from .env (copy .env.example); the defaults below are for local use only.
 name: skyjourney
 
 services:
@@ -21,6 +23,42 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  # Applies pending EF Core migrations once and exits, as a production release step would.
+  migrate:
+    profiles: ["api"]
+    build:
+      context: ./backend
+      target: migrations
+    image: skyjourney-migrations:local
+    environment:
+      ConnectionStrings__SkyJourney: Host=postgres;Port=5432;Database=${POSTGRES_DB:-skyjourney};Username=${POSTGRES_USER:-skyjourney};Password=${POSTGRES_PASSWORD:-skyjourney_dev_password}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    profiles: ["api"]
+    build:
+      context: ./backend
+      target: final
+    image: skyjourney-api:local
+    restart: unless-stopped
+    environment:
+      # Production settings (no migrations on startup, structured JSON logs) with local overrides.
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__SkyJourney: Host=postgres;Port=5432;Database=${POSTGRES_DB:-skyjourney};Username=${POSTGRES_USER:-skyjourney};Password=${POSTGRES_PASSWORD:-skyjourney_dev_password}
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:-local-compose-only-signing-key-never-use-in-production}
+      FlightData__SeedOnStartup: "true" # deterministic demo data, idempotent
+      OpenApi__Enabled: ${OPENAPI_ENABLED:-true}
+    ports:
+      - "${API_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
 volumes:
   skyjourney-pgdata:

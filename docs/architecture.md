@@ -255,7 +255,25 @@ Routes live in `src/app` (the Expo SDK 57 template convention) and imports use t
   payable. Any payment error reloads the booking, so an expired hold is shown as expired.
 
 ## Deployment (prepared, not deployed)
-- The API ships as a multi-stage Docker image running as the non-root `app` user.
-- The recommended hosting is a container platform with managed PostgreSQL; options are compared in `docs/deployment.md`.
-- Migrations run as an explicit release step (an EF Core migration bundle), never on production app startup.
-- Mobile builds use Expo EAS (development, preview and production profiles). TestFlight first, then Google Play internal testing.
+- **Image** (`backend/Dockerfile`): a multi-stage build. The SDK stage restores from the project files only, so
+  dependency layers stay cached, then publishes. The final stage is `aspnet:10.0`, which is Ubuntu-based and includes
+  the ICU and tzdata that IANA time zones need. It listens on port 8080 and runs as the non-root `app` user (uid 1654).
+  Configuration comes only from environment variables (`ConnectionStrings__SkyJourney`, `Jwt__SigningKey`, …), and no
+  secret is baked into the image.
+- **Migrations are a release step.** The `migrations` build target packages an EF Core migration bundle. Run it once
+  before the new API version starts:
+  `docker run --rm -e ConnectionStrings__SkyJourney=… skyjourney-migrations`. The bundle is idempotent and takes
+  EF Core's migration lock. The API never migrates on startup outside Development.
+- **Local production-like stack:** `docker compose --profile api up -d --build` starts Postgres, runs the `migrate`
+  service to completion, then starts the API on `http://localhost:8080` in the Production environment, with demo
+  seeding enabled. The plain `docker compose up -d` still starts only Postgres.
+- **Reverse proxy:** set `ForwardedHeaders__Enabled=true` when the platform terminates TLS in front of the container,
+  so the per-IP auth rate limit sees the real client. The setting trusts `X-Forwarded-For` from any address for one
+  hop, so enable it only if the container is reachable solely through the proxy.
+- **Data Protection:** ASP.NET Core logs that its key ring lives on the container's ephemeral filesystem. Nothing uses
+  it today: tokens are JWTs and refresh tokens are stored hashed in the database, with no cookies or Identity token
+  providers. Persist the key ring if password-reset or email-confirmation tokens are added later.
+- The recommended hosting is a container platform with managed PostgreSQL; options are compared in
+  `docs/deployment.md`.
+- Mobile builds use Expo EAS (development, preview and production profiles). TestFlight first, then Google Play
+  internal testing.

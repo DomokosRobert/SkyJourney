@@ -336,3 +336,35 @@ is filled in by the next commit (or listed in the final report).
   - Schedules are create-only. Changing a timetable that has sold flights needs re-accommodation, which is out of scope.
   - Known edge case: two schedules for the same flight number created at the same instant could both pass the overlap
     check. The flights' unique index (number + local date) still prevents duplicate flights.
+
+## M16 — `build(docker): containerize API and add production-like compose stack`
+- **Previous commit:** M15 = `1a7f6f1`.
+- **What it adds:**
+  - **`backend/Dockerfile`:** multi-stage, with a non-root `aspnet:10.0` runtime on port 8080. A separate
+    `migrations` target holds an EF Core migration bundle for the release step. `backend/.dockerignore` keeps
+    `bin`/`obj`, tests and `.env` files out of the build context.
+  - **`docker-compose.yml`:** a new `api` profile. A one-shot `migrate` service runs before the API, which starts in
+    the Production environment. The plain `docker compose up -d` still starts only Postgres.
+  - **`.env.example`:** `JWT_SIGNING_KEY` (a placeholder), `API_PORT` and `OPENAPI_ENABLED`.
+  - **Forwarded headers:** opt-in support (`ForwardedHeaders:Enabled`) so per-IP rate limiting works behind a TLS
+    proxy.
+- **Validation:**
+  - ✅ `dotnet build` (0 warnings), ✅ `dotnet format --verify-no-changes`, ✅ `dotnet test` 206/206.
+  - ✅ `docker build` of both targets on Colima (linux/arm64). Inside the image, `/usr/share/zoneinfo` and ICU are
+    present and the process runs as `uid=1654(app)`.
+  - ✅ `docker-compose --profile api up`:
+    - `migrate` exited 0 ("database is already up to date"), against the existing dev database, without resetting it.
+    - `/health/live` and `/health/ready` returned 200.
+    - The API worked end to end: a flight search returned 3 offers, registration returned 201, and Swagger returned
+      200.
+    - Logs are compact JSON.
+    - The containers were removed afterwards; Postgres and its data were left untouched.
+  - ⚠️ This machine has no buildx, so images were built with Docker's deprecated legacy builder through the standalone
+    `docker-compose` v2. The Dockerfile uses no BuildKit-only features, so it builds with either builder.
+  - ⚠️ Not tested: forwarded-header handling has no automated test. It is opt-in and off by default.
+  - ⚠️ Not done: an amd64 image build. CI builds natively on amd64 (M17).
+- **Decisions:**
+  - The migration bundle uses `aspnet` rather than `runtime` as its base image, because Infrastructure depends on the
+    ASP.NET Core shared framework through Identity. With `runtime` it exited with code 150.
+  - Compose falls back to a clearly named local-only signing key, so the stack starts without a `.env`. Real
+    environments must set `Jwt__SigningKey`; Production refuses to start without one.

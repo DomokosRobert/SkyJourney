@@ -1,0 +1,14 @@
+# Keep the build context small and free of local state and secrets.
+**/bin/
+**/obj/
+**/TestResults/
+**/*.user
+**/.vs/
+**/.idea/
+**/.env
+**/.env.*
+**/appsettings.*.local.json
+**/efbundle*
+tests/
+Dockerfile
+.dockerignore
