@@ -181,11 +181,13 @@ mobile/SkyJourney.Mobile/src
     (tabs)/            Search, Trips, Profile
     search/            results, flight details
     booking/           passengers, [reference]/seats, [reference]/checkout, [reference]/confirmation
+    trips/             [reference] (booking details and cancellation)
     auth/              login, register
   api/                 typed fetch client (Problem Details → ApiError), endpoints, query client
   auth/                AuthProvider, SecureStore token persistence, refresh single-flight
   booking/             booking-draft context, idempotency keys, seat-map layout, hold countdown, booking gate
   components/          design system (Button, Card, TextField, Screen, loading/empty/error states)
+  trips/               booking status presentation
   lib/                 formatting (airport-local times), network status
   theme/               colors, spacing, typography tokens
 ```
@@ -222,6 +224,10 @@ Routes live in `src/app` (the Expo SDK 57 template convention) and imports use t
 - **Seats** are saved one passenger at a time (`PUT …/seats` with one assignment); selection then moves to the next
   passenger without a seat. A conflict (`seat_unavailable`) shows a message, and the seat map is reloaded after every
   attempt. Seat selection is optional.
+- **Trips and cancellation.** The Trips tab pages through `GET /bookings` with an infinite query, newest first, and
+  supports pull-to-refresh. Booking details offer to continue paying while a hold is running. They also offer a
+  two-step cancellation: the first press loads the server's quote, which says whether the booking can be cancelled
+  and the refund under the fare rules; the second press cancels. The app never computes refunds itself.
 - **Payment** only offers the simulated test tokens; the app never asks for card details. A decline leaves the booking
   payable. Any payment error reloads the booking, so an expired hold is shown as expired.
 

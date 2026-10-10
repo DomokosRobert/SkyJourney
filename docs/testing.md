@@ -61,6 +61,8 @@ Mobile test conventions:
   in-memory fakes and use deferred promises to drive races such as concurrent refreshes.
 - Screen tests render the real screen inside the real providers and mock only `expo-router` and native modules
   (`expo-secure-store`).
+- `src/test/renderWithProviders` renders a screen inside the real query and auth providers. A signed-in session is
+  restored through a fake refresh, as at app start.
 - Booking-flow screen tests spy on `bookingsApi` instead of `fetch`, and check which idempotency key each payment
   attempt used: a new key after a decline, the same key after a lost response. Test `QueryClient`s set
   `gcTime: Infinity`, so no cache timers keep Jest running after the tests.

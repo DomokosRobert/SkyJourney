@@ -35,6 +35,7 @@ export default function RootLayout() {
               name="booking/[reference]/confirmation"
               options={{ title: 'Confirmed', headerBackVisible: false, gestureEnabled: false }}
             />
+            <Stack.Screen name="trips/[reference]" options={{ title: 'Booking' }} />
             <Stack.Screen name="auth/login" options={{ presentation: 'modal', title: 'Sign in' }} />
             <Stack.Screen name="auth/register" options={{ presentation: 'modal', title: 'Create account' }} />
           </Stack>

@@ -271,3 +271,34 @@ is filled in by the next commit (or listed in the final report).
     conflict shows up straight away rather than at checkout.
   - The create-booking key lives in the draft context. Going back and pressing Continue again replays the same booking
     instead of creating (and holding seats for) a second one.
+
+## M14 — `feat(mobile): add trips, booking details, cancellation and profile`
+- **Previous commit:** M13 = `44f358d`.
+- **What it adds:**
+  - **Trips tab:** an infinite, pull-to-refresh list of the user's bookings. Each card shows a status badge (Awaiting
+    payment, Confirmed, Completed, Cancelled or Expired). The tab also has signed-out, empty, error and offline states.
+  - **Booking details (`trips/[reference]`):**
+    - Each segment's flight, fare conditions and seats; the passengers; the total; and the simulated refund for
+      cancelled bookings.
+    - A "Continue to payment" button for unpaid bookings while the hold is running.
+    - A two-step cancellation based on the server's quote (refund amount, or the reason the booking can't be
+      cancelled).
+  - **Profile:** name editing (`PUT /api/v1/me`, Zod-validated). The session manager's stored profile is updated so
+    new bookings pre-fill the new name. The profile also has a short note on what data is stored.
+  - **API client:** `bookingsApi.list`, `cancellationQuote` and `cancel`, plus the hooks `useMyBookings`,
+    `useCancellationQuote` and `useCancelBooking`.
+- **Validation:**
+  - ✅ `npm run typecheck`, ✅ `npm run lint`, ✅ `npx expo-doctor` (21/21), ✅ `npx expo export --platform ios`.
+  - ✅ `npm test`: 109/109, of which 12 are new:
+    - Status labels.
+    - Trips: signed out, list and navigation, empty, retry after an error.
+    - Booking details: cancellation with a refund, refused by the quote, rejected by the server, and continuing an
+      unpaid booking.
+    - Profile: update with session sync, and local validation.
+  - The Trips tab renders on the iOS simulator (signed-out state).
+  - ⚠️ Not done: tapping through signed-in flows on the simulator. I can't drive the simulator from here. The list,
+    quote and cancel endpoints were checked by hand against the dev API in M11.
+- **Decisions:**
+  - Bookings are shown as one list, newest first, with status badges. They are not split into upcoming and past tabs,
+    because sections built on the client from paged data would move items around as more pages load.
+  - Unpaid bookings can be cancelled too; the domain allows it, and it releases the held seats straight away.

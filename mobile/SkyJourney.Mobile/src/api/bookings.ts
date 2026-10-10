@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { apiRequest } from './client';
 import type { Airport, FareConditions, FareFamily, Money } from './types';
@@ -84,6 +84,26 @@ export type PaymentResult = {
   booking: Booking;
 };
 
+export type BookingSummary = {
+  id: string;
+  reference: string;
+  status: BookingStatus;
+  createdAt: string;
+  totalPrice: Money;
+  passengerCount: number;
+  origin: Airport;
+  destination: Airport;
+  departureLocal: string;
+  departureUtc: string;
+  returnDepartureLocal: string | null;
+  /** Not cancelled or expired, and the first flight has not departed yet. */
+  isUpcoming: boolean;
+};
+
+export type PagedResult<T> = { items: T[]; page: number; pageSize: number; totalCount: number; totalPages: number };
+
+export type CancellationQuote = { canCancel: boolean; refund: Money | null; reasonCode: string | null; reason: string | null };
+
 export type CreateBookingRequest = {
   outbound: { flightId: string; fareFamily: FareFamily };
   return: { flightId: string; fareFamily: FareFamily } | null;
@@ -97,6 +117,8 @@ const path = (reference: string) => `/api/v1/bookings/${encodeURIComponent(refer
 export const bookingsApi = {
   create: (body: CreateBookingRequest, idempotencyKey: string) =>
     apiRequest<Booking>('/api/v1/bookings', { method: 'POST', body, headers: { [IDEMPOTENCY_HEADER]: idempotencyKey } }),
+  list: (page: number, pageSize: number, signal?: AbortSignal) =>
+    apiRequest<PagedResult<BookingSummary>>(`/api/v1/bookings?page=${page}&pageSize=${pageSize}`, { signal }),
   get: (reference: string, signal?: AbortSignal) => apiRequest<Booking>(path(reference), { signal }),
   seatMap: (reference: string, segmentId: string, signal?: AbortSignal) =>
     apiRequest<SeatMap>(`${path(reference)}/segments/${segmentId}/seat-map`, { signal }),
@@ -108,13 +130,31 @@ export const bookingsApi = {
       body: { paymentToken },
       headers: { [IDEMPOTENCY_HEADER]: idempotencyKey },
     }),
+  cancellationQuote: (reference: string, signal?: AbortSignal) =>
+    apiRequest<CancellationQuote>(`${path(reference)}/cancellation`, { signal }),
+  cancel: (reference: string) => apiRequest<Booking>(`${path(reference)}/cancel`, { method: 'POST' }),
 };
 
 export const bookingKeys = {
   all: ['bookings'] as const,
+  list: () => ['bookings', 'list'] as const,
   detail: (reference: string) => ['bookings', 'detail', reference] as const,
   seatMap: (reference: string, segmentId: string) => ['bookings', 'detail', reference, 'seat-map', segmentId] as const,
+  cancellation: (reference: string) => ['bookings', 'detail', reference, 'cancellation'] as const,
 };
+
+export const BOOKINGS_PAGE_SIZE = 20;
+
+/** The signed-in user's bookings, newest first, loaded page by page. */
+export function useMyBookings(enabled: boolean) {
+  return useInfiniteQuery({
+    queryKey: bookingKeys.list(),
+    queryFn: ({ pageParam, signal }) => bookingsApi.list(pageParam, BOOKINGS_PAGE_SIZE, signal),
+    initialPageParam: 1,
+    getNextPageParam: (last) => (last.page < last.totalPages ? last.page + 1 : undefined),
+    enabled,
+  });
+}
 
 export function useBooking(reference: string) {
   return useQuery({
@@ -149,6 +189,31 @@ export function useSelectSeat(reference: string, segmentId: string) {
     onSuccess: store,
     // Success or conflict, the seat map changed (or was stale): reload it.
     onSettled: () => queryClient.invalidateQueries({ queryKey: bookingKeys.seatMap(reference, segmentId) }),
+  });
+}
+
+/** Whether the booking can be cancelled now, and the refund. Always fresh: it depends on the clock and the fare. */
+export function useCancellationQuote(reference: string, enabled: boolean) {
+  return useQuery({
+    queryKey: bookingKeys.cancellation(reference),
+    queryFn: ({ signal }) => bookingsApi.cancellationQuote(reference, signal),
+    enabled,
+    staleTime: 0,
+  });
+}
+
+export function useCancelBooking(reference: string) {
+  const queryClient = useQueryClient();
+  const store = useStoreBooking();
+  return useMutation({
+    mutationFn: () => bookingsApi.cancel(reference),
+    onSuccess: (booking) => {
+      store(booking);
+      queryClient.removeQueries({ queryKey: bookingKeys.cancellation(reference) });
+      void queryClient.invalidateQueries({ queryKey: bookingKeys.list() });
+    },
+    // A refused cancellation (cutoff passed, payment running) may mean the booking changed: reload it.
+    onError: () => queryClient.invalidateQueries({ queryKey: bookingKeys.detail(reference) }),
   });
 }
 

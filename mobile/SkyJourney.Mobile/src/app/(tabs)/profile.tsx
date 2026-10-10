@@ -1,10 +1,17 @@
+import { zodResolver } from '@hookform/resolvers/zod';
 import { router } from 'expo-router';
 import { useState } from 'react';
+import { useForm } from 'react-hook-form';
 import { StyleSheet, View } from 'react-native';
 
+import { authApi, type UserProfile } from '@/api/auth';
 import { useAuthState, useSession } from '@/auth/AuthProvider';
-import { AppText, Button, Card, EmptyState, LoadingState, Screen } from '@/components';
-import { spacing } from '@/theme';
+import { describeAuthError, fieldErrorsFor } from '@/auth/errors';
+import { profileSchema, type ProfileForm } from '@/auth/schemas';
+import { AppText, Button, Card, EmptyState, FormMessage, FormTextField, LoadingState, Screen } from '@/components';
+import { colors, spacing } from '@/theme';
+
+const FIELDS = ['firstName', 'lastName'] as const;
 
 export default function ProfileScreen() {
   const auth = useAuthState();
@@ -51,8 +58,62 @@ export default function ProfileScreen() {
         <AppText>{user.email}</AppText>
         {user.roles.includes('Admin') ? <AppText variant="caption">Administrator</AppText> : null}
       </Card>
+      <EditName user={user} />
+      <Button title="My trips" variant="secondary" onPress={() => router.navigate('/trips')} />
+      <AppText variant="caption" color={colors.textMuted}>
+        SkyJourney stores only your name, e-mail address and the passenger names you enter for bookings. Payments are
+        simulated; no card details are ever collected.
+      </AppText>
       <Button title="Sign out" variant="danger" loading={signingOut} onPress={onSignOut} />
     </Screen>
+  );
+}
+
+/** The account holder's name, used to pre-fill the first passenger of new bookings. */
+function EditName({ user }: { user: UserProfile }) {
+  const session = useSession();
+  const [editing, setEditing] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const { control, handleSubmit, setError, reset, formState } = useForm<ProfileForm>({
+    resolver: zodResolver(profileSchema),
+    values: { firstName: user.firstName, lastName: user.lastName },
+  });
+
+  const onSave = handleSubmit(async (values) => {
+    setFormError(null);
+    try {
+      await session.updateUser(await authApi.updateMe(values));
+      setEditing(false);
+    } catch (error) {
+      const fieldErrors = fieldErrorsFor(error, FIELDS);
+      Object.entries(fieldErrors).forEach(([field, message]) => setError(field as keyof ProfileForm, { message }));
+      if (Object.keys(fieldErrors).length === 0) {
+        setFormError(describeAuthError(error));
+      }
+    }
+  });
+
+  if (!editing) {
+    return <Button title="Edit name" variant="secondary" onPress={() => setEditing(true)} />;
+  }
+
+  return (
+    <Card>
+      <FormMessage message={formError} />
+      <FormTextField control={control} name="firstName" label="First name" autoComplete="given-name" textContentType="givenName" />
+      <FormTextField control={control} name="lastName" label="Last name" autoComplete="family-name" textContentType="familyName" onSubmitEditing={onSave} />
+      <Button title="Save" loading={formState.isSubmitting} onPress={onSave} />
+      <Button
+        title="Cancel"
+        variant="secondary"
+        disabled={formState.isSubmitting}
+        onPress={() => {
+          reset();
+          setFormError(null);
+          setEditing(false);
+        }}
+      />
+    </Card>
   );
 }
 
