@@ -437,3 +437,25 @@ is filled in by the next commit (or listed in the final report).
     with "No account with e-mail …"; no data was changed.
   - ✅ Every existing migration's `Up` is additive, as the guide says; drops appear only in `Down`.
   - ⚠️ Not done: none of the cloud or store steps were run. They need the owner's accounts and credentials.
+
+## M20 — `test(e2e): add end-to-end journey tests and API smoke script`
+- **Previous commit:** M19 = `014ad04`.
+- **What it adds:**
+  - **`EndToEnd/JourneyTests`** (2 tests), which use the public API only:
+    - A round trip for 2 adults: search, sign-up, booking at exactly the quoted price, seat selection with seat
+      fees, a declined then a successful simulated payment, the trip list, the Flex cancellation quote, and
+      cancellation with a full refund. Seat inventory is back where it started afterwards.
+    - An admin flight cancellation that refunds a paid Basic booking in full and removes the flight from sale.
+  - **`scripts/e2e_smoke.py`**, a black-box smoke test over real HTTP against any running API. It uses only the Python
+    standard library. It checks health, search, register, booking with an idempotent replay, payment, details and
+    list, the quote, cancellation, and that bookings require authentication.
+  - **`docs/testing.md`**: an end-to-end section.
+- **Validation:**
+  - ✅ `dotnet format --verify-no-changes`.
+  - ✅ `dotnet test`: 208/208 (2 new).
+  - ✅ The smoke script passed against the dev API (`http://localhost:5080`). It booked SJ102 BUD-LHR Flex at 190.99
+    EUR, then confirmed and cancelled it with a full refund. It was not run against the compose container in this
+    milestone, because the compose stack itself was verified in M16.
+- **Deviation from the plan:** the plan listed Maestro flows. Maestro and the Java it needs are not installed, and
+  installing system software was not part of the agreed scope. Flows that were never run would be misleading
+  placeholders, so none were written. Mobile UI E2E remains a known gap; see `docs/testing.md`.

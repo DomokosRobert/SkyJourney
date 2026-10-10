@@ -4,7 +4,9 @@
 |-------|----------|----------------|-------|
 | Unit | `backend/tests/SkyJourney.UnitTests` | Domain rules (money, DST, schedules, booking state machine, refunds), validators, pricing, the demo data set | .NET 10 SDK |
 | Integration | `backend/tests/SkyJourney.IntegrationTests` | The real API hosted in memory (`WebApplicationFactory`) against a throwaway PostgreSQL 17 container (Testcontainers) | .NET 10 SDK + a running Docker engine |
-| Mobile | `mobile/SkyJourney.Mobile` | Type checking, lint, component/unit tests (jest-expo) | Node 22 |
+| End-to-end (API) | `backend/tests/SkyJourney.IntegrationTests/EndToEnd` | Whole journeys through the public API in the app's call order | Same as integration |
+| Smoke (black box) | `scripts/e2e_smoke.py` | The booking journey over real HTTP against a running deployment | Python 3.9+ and a running API |
+| Mobile | Type checking, lint, component/unit tests (jest-expo) | Node 22 |
 
 ## Running
 
@@ -71,7 +73,28 @@ Mobile test conventions:
   attempt used: a new key after a decline, the same key after a lost response. Test `QueryClient`s set
   `gcTime: Infinity`, so no cache timers keep Jest running after the tests.
 - jest-expo replaces the global `fetch` with a stub, so jest tests can't reach a running API. Live checks against the
-  local API are manual (see the implementation log), and E2E is covered in M20.
+  local API are manual (see the implementation log). End-to-end coverage is described below.
+
+### End-to-end
+- **Journey tests** (`EndToEnd/JourneyTests`) run in the integration suite. They only use the public API, in the
+  order the mobile app calls it:
+  - search, then sign-up, round-trip booking, seats, a declined then a successful payment, the trip list, the
+    cancellation quote, and cancellation;
+  - an airline (admin) cancellation that refunds a paid Basic booking and takes the flight off sale.
+
+  They use BUD-BCN 15 Nov, BCN-BUD 19 Nov and BUD-AMS 17 Nov.
+- **Smoke script.** It runs the same booking journey against any running API, using the real clock and real HTTP. It
+  books BUD-LHR 7 days ahead. It **creates a user and a (cancelled) booking**, so use it only against development or
+  staging:
+
+  ```bash
+  python3 scripts/e2e_smoke.py                          # dotnet run (http://localhost:5080)
+  python3 scripts/e2e_smoke.py http://localhost:8080    # docker-compose --profile api up
+  ```
+- **Mobile UI E2E is not automated yet.** The obvious tool is Maestro, which needs Java and the Maestro CLI. Neither is
+  installed on the development machine, so no flows were written: flows that have never run would claim more coverage
+  than exists. The mobile screens are covered by the jest screen tests, and the app was exercised by hand on the iOS
+  simulator (see the implementation log).
 
 ### Docker via Colima (macOS)
 Testcontainers starts a helper container (Ryuk) that mounts the Docker socket. With Colima, the
