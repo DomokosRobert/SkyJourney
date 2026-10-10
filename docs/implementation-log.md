@@ -61,3 +61,16 @@ is filled in by the next commit (or listed in the final report).
   `sort` is a case-insensitive string because minimal-API enum binding is case-sensitive; the return leg is validated against
   the outbound arrival (minimum stay) at booking time, not in search.
 - **Deferred:** a periodic job that extends the flight horizon (lands with the background jobs in M12).
+
+## M6 — `test(flights): add flight search unit and integration tests`
+- **Previous commit:** M5 = `a90a3e0`.
+- **Content:** unit tests for the search validator, fare pricing and the deterministic data set (determinism, unique keys,
+  bidirectional routes, every schedule passes domain validation); new `SkyJourney.IntegrationTests` project
+  (`WebApplicationFactory` + Testcontainers PostgreSQL 17 assembly fixture, frozen `FakeTimeProvider`) covering one-way/return
+  search, local/UTC times, sorting, time-window filter, sales cutoff, capacity filtering, cancelled flights, unavailable fares,
+  404/400 Problem Details, flight details, lowest-fare calendar, airport ranking, destinations and importer idempotency;
+  `docs/testing.md`.
+- **Validation:** ✅ `dotnet build` (0 warnings); ✅ unit tests 76/76; ✅ integration tests 22/22 (with
+  `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock`, see below).
+- **Finding:** this machine runs Docker through Colima. Ryuk's socket bind mount fails unless the override variable points at
+  the in-VM socket path. Documented in `docs/testing.md`; CI (Linux) does not need it.

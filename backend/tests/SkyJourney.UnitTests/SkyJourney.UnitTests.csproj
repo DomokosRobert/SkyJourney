@@ -9,6 +9,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\SkyJourney.Application\SkyJourney.Application.csproj" />
+    <ProjectReference Include="..\..\src\SkyJourney.Infrastructure\SkyJourney.Infrastructure.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />
