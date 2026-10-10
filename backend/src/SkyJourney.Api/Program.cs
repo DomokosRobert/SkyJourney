@@ -1,5 +1,6 @@
 using Serilog;
 using SkyJourney.Api.Common;
+using SkyJourney.Api.Endpoints;
 using SkyJourney.Application;
 using SkyJourney.Infrastructure;
 using SkyJourney.Infrastructure.Persistence;
@@ -44,6 +45,10 @@ try
     }
 
     app.MapHealthEndpoints();
+
+    var api = app.MapGroup("/api/v1");
+    api.MapAirportEndpoints();
+    api.MapFlightEndpoints();
 
     await app.RunAsync();
 }

@@ -1,0 +1,23 @@
+# Requests for the VS Code REST Client / JetBrains HTTP client / Visual Studio.
+# All flights are generated demo data ("dataSource": "demo").
+@baseUrl = http://localhost:5080
+@date = 2026-11-02
+@returnDate = 2026-11-06
+
+### Health
+GET {{baseUrl}}/health/ready
+
+### Airport search
+GET {{baseUrl}}/api/v1/airports?query=lon&limit=10
+
+### Destinations served from Budapest
+GET {{baseUrl}}/api/v1/airports/BUD/destinations
+
+### One-way search, cheapest first
+GET {{baseUrl}}/api/v1/flights/search?origin=BUD&destination=LHR&departureDate={{date}}&adults=1
+
+### Return search, 2 adults + 1 child, departing after 10:00, sorted by departure time
+GET {{baseUrl}}/api/v1/flights/search?origin=BUD&destination=CDG&departureDate={{date}}&returnDate={{returnDate}}&adults=2&children=1&sort=departure&departAfter=10:00
+
+### Lowest fare per day (calendar price hints)
+GET {{baseUrl}}/api/v1/flights/lowest-fares?origin=BUD&destination=LHR&from=2026-11-01&to=2026-11-30

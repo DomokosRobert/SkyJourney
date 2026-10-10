@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using SkyJourney.Application.FlightData;
 
 namespace SkyJourney.Infrastructure.Persistence;
 
@@ -17,8 +18,9 @@ public static class DatabaseInitializer
 {
     public static async Task InitializeAsync(IServiceProvider services, IConfiguration configuration, CancellationToken cancellationToken = default)
     {
-        var options = configuration.GetSection(DatabaseOptions.SectionName).Get<DatabaseOptions>() ?? new DatabaseOptions();
-        if (!options.MigrateOnStartup)
+        var database = configuration.GetSection(DatabaseOptions.SectionName).Get<DatabaseOptions>() ?? new DatabaseOptions();
+        var flightData = configuration.GetSection(FlightDataOptions.SectionName).Get<FlightDataOptions>() ?? new FlightDataOptions();
+        if (!database.MigrateOnStartup && !flightData.SeedOnStartup)
         {
             return;
         }
@@ -27,11 +29,22 @@ public static class DatabaseInitializer
         var db = scope.ServiceProvider.GetRequiredService<SkyJourneyDbContext>();
         var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(DatabaseInitializer));
 
-        var pending = (await db.Database.GetPendingMigrationsAsync(cancellationToken)).ToList();
-        if (pending.Count > 0)
+        if (database.MigrateOnStartup)
         {
-            logger.LogInformation("Applying {Count} pending migration(s): {Migrations}", pending.Count, pending);
-            await db.Database.MigrateAsync(cancellationToken);
+            var pending = (await db.Database.GetPendingMigrationsAsync(cancellationToken)).ToList();
+            if (pending.Count > 0)
+            {
+                logger.LogInformation("Applying {Count} pending migration(s): {Migrations}", pending.Count, pending);
+                await db.Database.MigrateAsync(cancellationToken);
+            }
+        }
+
+        if (flightData.SeedOnStartup)
+        {
+            var importer = scope.ServiceProvider.GetRequiredService<FlightDataImporter>();
+            var today = DateOnly.FromDateTime(scope.ServiceProvider.GetRequiredService<TimeProvider>().GetUtcNow().UtcDateTime);
+            await importer.ImportReferenceDataAsync(cancellationToken);
+            await importer.GenerateFlightsAsync(today, today.AddDays(flightData.HorizonDays), cancellationToken);
         }
     }
 }

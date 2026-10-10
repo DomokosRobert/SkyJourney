@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using SkyJourney.Domain.Airports;
 using SkyJourney.Domain.Bookings;
@@ -31,6 +32,8 @@ public interface ISkyJourneyDbContext
     DbSet<PaymentAttempt> PaymentAttempts { get; }
 
     DatabaseFacade Database { get; }
+
+    EntityEntry Entry(object entity);
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

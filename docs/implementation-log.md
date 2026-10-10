@@ -44,3 +44,20 @@ is filled in by the next commit (or listed in the final report).
 - **Validation:** ✅ `dotnet build` (0 warnings); ✅ `dotnet ef database update` against compose PostgreSQL (21 tables);
   ✅ `dotnet test`: 44/44 domain unit tests (money, DST conversion, schedule generation, booking lifecycle, seats, refunds).
 - **Decision:** xUnit v3 4.x requires Microsoft Testing Platform under the .NET 10 SDK, so `global.json` opts in (`test.runner`).
+
+## M5 — `feat(flights): implement airport and flight search with seed data`
+- **Previous commit:** M4 = `a1ba3e4`.
+- **Content:** `IFlightDataProvider` abstraction and `DeterministicFlightDataProvider` (30 real airports, the fictional
+  airline SkyJourney Air `SJ`, 3 aircraft types, 100 schedules derived from great-circle distance and a stable hash);
+  idempotent `FlightDataImporter` (reference data + schedule → flight generation); startup seeding behind
+  `FlightData:SeedOnStartup` (on in Development only); endpoints `GET /api/v1/airports`, `/airports/{iata}`,
+  `/airports/{iata}/destinations`, `/flights/search` (one-way/return, passengers, sort, departure-time window, max price),
+  `/flights/{id}`, `/flights/lowest-fares`; `SkyJourney.Api.http` sample requests.
+- **Validation:** ✅ `dotnet build` (0 warnings); ✅ `dotnet test` 44/44; ✅ manual smoke test against compose PostgreSQL:
+  first start imported 30 airports / 100 schedules and generated 8,632 flights (~3 s); a restart generated 0 (idempotent);
+  search returned local + UTC times with offsets across a DST-different pair (BUD→LHR); 400 ProblemDetails for invalid
+  input and past dates; 404 for unknown airports; OpenAPI document lists all six routes.
+- **Decisions:** results expose `seatsLeft` only when ≤ 9 seats remain; children pay the adult fare (documented simplification);
+  `sort` is a case-insensitive string because minimal-API enum binding is case-sensitive; the return leg is validated against
+  the outbound arrival (minimum stay) at booking time, not in search.
+- **Deferred:** a periodic job that extends the flight horizon (lands with the background jobs in M12).
