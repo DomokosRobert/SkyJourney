@@ -421,3 +421,19 @@ is filled in by the next commit (or listed in the final report).
     `example.com` identifiers cannot be submitted to either store, by design.
   - `usesNonExemptEncryption: false` is set because the app only uses OS-provided TLS. The owner must confirm this
     export-compliance answer for their own submission.
+
+## M19 — `docs: add deployment guide`
+- **Previous commit:** M18 = `efb0e8b`.
+- **What it adds:** `docs/deployment.md`.
+  - What gets deployed, and a comparison of three hosting options. Azure Container Apps with managed PostgreSQL is the
+    recommended default. No prices are quoted; check current pricing.
+  - The full environment-variable reference.
+  - The release procedure: build, push, migrate with the bundle, roll out, and health probes.
+  - Provisioning the first administrator.
+  - The EAS build and submit sequence (TestFlight first, then Play internal).
+  - A credentials checklist for the owner.
+- **Validation:**
+  - ✅ `promote-admin` runs through the API image against the compose database. With a non-existent email it exits 1
+    with "No account with e-mail …"; no data was changed.
+  - ✅ Every existing migration's `Up` is additive, as the guide says; drops appear only in `Down`.
+  - ⚠️ Not done: none of the cloud or store steps were run. They need the owner's accounts and credentials.
