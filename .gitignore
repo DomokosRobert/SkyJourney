@@ -1,0 +1,48 @@
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+.cursor/*
+!.cursor/rules/
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+!**/.env.example
+*.pem
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.jks
+*.keystore
+google-services*.json
+GoogleService-Info.plist
+
+# .NET
+bin/
+obj/
+*.user
+*.suo
+TestResults/
+*.trx
+coverage*/
+artifacts/
+efbundle*
+
+# Node / Expo
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+npm-debug.*
+yarn-error.*
+*.tsbuildinfo
+/mobile/SkyJourney.Mobile/ios/
+/mobile/SkyJourney.Mobile/android/
+.metro-health-check*
