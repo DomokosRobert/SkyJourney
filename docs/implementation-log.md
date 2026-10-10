@@ -74,3 +74,24 @@ is filled in by the next commit (or listed in the final report).
   `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock`, see below).
 - **Finding:** this machine runs Docker through Colima. Ryuk's socket bind mount fails unless the override variable points at
   the in-VM socket path. Documented in `docs/testing.md`; CI (Linux) does not need it.
+
+## M7 — `feat(mobile): initialize Expo app, design system and navigation`
+- **Previous commit:** M6 = `c28e691`.
+- **Content:** Expo SDK 57 app in `mobile/SkyJourney.Mobile` (from `create-expo-app` blank-typescript template; React Native 0.86,
+  React 19.2, TypeScript 6, strict + `noUncheckedIndexedAccess`); Expo Router with typed routes, `skyjourney` scheme and a
+  Search / Trips / Profile tab layout; theme tokens and design-system components (AppText, Button, Card, TextField, Screen,
+  Loading/Empty/Error states, OfflineBanner); typed fetch client mapping Problem Details to `ApiError` with timeout and
+  pluggable auth hooks (used in M10); runtime API base URL resolution; TanStack Query client wired to NetInfo and app focus;
+  airport-local date/time formatting helpers; Jest (jest-expo) + React Native Testing Library; ESLint (eslint-config-expo).
+  The search tab currently shows an API connectivity check; Trips and Profile show honest empty states until their milestones.
+- **Validation:** ✅ `npm run typecheck`; ✅ `npm run lint`; ✅ `npm test` 18/18 (URL resolution, formatting, API client
+  error mapping and token-refresh retry, Button); ✅ `npx expo-doctor` 21/21; ✅ `npx expo export --platform ios` bundles.
+  Not yet run on a simulator/device (needs the search UI from M8 to be meaningful).
+- **Decisions:**
+  - Package policy (no releases younger than two weeks): `expo` pinned to 57.0.25 (57.0.26/27 are newer) and excluded from
+    expo-doctor's version check via `expo.install.exclude`; ESLint pinned to 9.39.5 because `expo lint` requires ESLint 9;
+    Jest 29.7 / `@types/jest` 29.5 as expected by the SDK; `@react-native/jest-preset` 0.86.3 and `test-renderer` 1.3.0 added
+    as required peers of jest-expo 57 and RNTL 14.
+  - Removed template files that do not belong to this project: the template's `.claude/` settings (enabled a third-party
+    plugin), `LICENSE`, `App.tsx`, `index.ts`. Kept the template `AGENTS.md` (Expo-specific agent guidance).
+  - TypeScript 6 no longer auto-includes all `@types`, so `tsconfig.json` lists `"types": ["jest"]`.

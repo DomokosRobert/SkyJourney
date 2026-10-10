@@ -129,22 +129,30 @@ Payment attempts go `Pending → Succeeded | Failed`. A succeeded payment can th
 ## Mobile architecture
 
 ```
-mobile/SkyJourney.Mobile
+mobile/SkyJourney.Mobile/src
   app/                 Expo Router routes (file-based navigation)
     (tabs)/            Search, Trips, Profile
     search/            results, flight details
     booking/           passengers, seats, review, payment, confirmation
     auth/              login, register
-  src/api/             typed fetch client, endpoints, query keys
-  src/auth/            AuthProvider, SecureStore token persistence, refresh single-flight
-  src/booking/         booking-draft context (search criteria and selected flights)
-  src/components/      design system (Button, Card, TextField, Screen, states)
-  src/theme/           colors, spacing, typography tokens
+  api/                 typed fetch client (Problem Details → ApiError), endpoints, query client
+  auth/                AuthProvider, SecureStore token persistence, refresh single-flight
+  booking/             booking-draft context (search criteria and selected flights)
+  components/          design system (Button, Card, TextField, Screen, loading/empty/error states)
+  lib/                 formatting (airport-local times), network status
+  theme/               colors, spacing, typography tokens
 ```
+
+Routes live in `src/app` (the Expo SDK 57 template convention) and imports use the `@/` alias for `src/`.
 
 - **Server state** lives in TanStack Query. **Draft state** (criteria, selected flights) lives in a React context.
 - The API base URL is resolved at runtime: `EXPO_PUBLIC_API_URL` if set. Otherwise, in development,
-  the host of the Metro bundler (works on a physical iPhone on the same Wi-Fi), and `10.0.2.2` on the Android emulator.
+  the host of the Metro bundler (works on a physical iPhone on the same Wi-Fi), falling back to `localhost` on the
+  iOS simulator and `10.0.2.2` on the Android emulator. The API listens on port 5080.
+- Offline handling: NetInfo feeds TanStack Query's `onlineManager`, so queries pause offline and refetch on reconnect;
+  every screen shows an offline banner. Only network errors and 5xx responses are retried.
+- Airport-local times are displayed by reading the wall-clock part of the API's offset-qualified ISO strings, never by
+  converting to the phone's time zone.
 - The refresh token is stored in SecureStore (iOS Keychain / Android Keystore). The access token stays in memory only.
 
 ## Deployment (prepared, not deployed)
