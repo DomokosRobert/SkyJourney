@@ -25,6 +25,10 @@ Both test projects use **xUnit v3 on Microsoft Testing Platform**. `backend/glob
   flights, prices and sales-cutoff behaviour are identical on every run and every machine.
 - Tests that change data (sold-out flights, cancellations) use their own route and date, so they don't
   interfere with other tests that run in parallel.
+- Auth tests register a unique `user-<guid>@example.com` per test. Tests that move time forward (token expiry)
+  or need different settings (rate limits) start a second in-memory host on the same database with its own
+  `FakeTimeProvider` (`factory.WithOwnClock(...)`), so the shared frozen clock never changes.
+- The shared host raises the auth rate limit, because every in-memory request comes from the same "client IP".
 
 ### Docker via Colima (macOS)
 Testcontainers starts a helper container (Ryuk) that mounts the Docker socket. With Colima, the

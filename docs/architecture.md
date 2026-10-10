@@ -120,10 +120,19 @@ Payment attempts go `Pending → Succeeded | Failed`. A succeeded payment can th
 ## Security
 - ASP.NET Core Identity handles password hashing and lockout. Access tokens are short-lived JWTs (15 min).
   Refresh tokens are opaque, rotated on every use, and stored only as SHA-256 hashes. Reusing a token revokes the whole family ([ADR-0003](adr/0003-authentication-jwt-and-rotating-refresh-tokens.md)).
-- `Admin` role policy for `/api/v1/admin/*`. The first admin is provisioned with a CLI command, never through config.
+- `Admin` role policy for `/api/v1/admin/*`. Admins are provisioned with a CLI command, never through config or an endpoint:
+  `dotnet run --project backend/src/SkyJourney.Api -- promote-admin user@example.com` (the account must exist).
+  The role reaches existing sessions on their next token refresh.
+- The JWT signing key comes from `Jwt__SigningKey` (≥ 32 bytes). Production refuses to start without it. Development
+  and tests generate a random per-process key, so access tokens die on restart and clients silently refresh.
+- Login failures return the same `401 invalid_credentials` for unknown e-mails and wrong passwords (a dummy hash is
+  verified in both cases). Five failures lock the account for 15 minutes (`401 account_locked`). Registration does
+  reveal that an e-mail is taken (`409 email_taken`); that is accepted for usability, and the endpoint is rate limited.
+- Refresh-token reuse detection is strict: two refreshes racing with the same token count as reuse and end the
+  session. The mobile client therefore refreshes single-flight.
 - Every booking query is filtered by the authenticated user's ID. Another user's booking returns `404` (no IDOR, no existence leak).
 - Prices, totals, status and seat availability are always computed on the server.
-- Rate limiting covers auth and payment endpoints. Request logging never includes bodies or the `Authorization` header.
+- Rate limiting (fixed window per client IP, `RateLimiting` settings, `429 rate_limited` with `Retry-After`) covers auth and payment endpoints. Behind a proxy, forwarded headers must be configured so the real client IP is used (see deployment docs). Request logging never includes bodies or the `Authorization` header.
 - Production returns Problem Details without stack traces. Secrets come from environment variables or user-secrets.
 
 ## Mobile architecture

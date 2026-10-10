@@ -33,6 +33,8 @@ public sealed class SkyJourneyDbContext(DbContextOptions<SkyJourneyDbContext> op
 
     public DbSet<PaymentAttempt> PaymentAttempts => Set<PaymentAttempt>();
 
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);

@@ -24,6 +24,7 @@ public sealed class GlobalExceptionHandler(
             ConflictException conflict => Problem(StatusCodes.Status409Conflict, "Conflict", conflict.Message, conflict.Code),
             DomainException domain => Problem(StatusCodes.Status409Conflict, "Business rule violated", domain.Message, domain.Code),
             UnprocessableException unprocessable => Problem(StatusCodes.Status422UnprocessableEntity, "Unprocessable request", unprocessable.Message, unprocessable.Code),
+            UnauthorizedException unauthorized => Problem(StatusCodes.Status401Unauthorized, "Unauthorized", unauthorized.Message, unauthorized.Code),
             ForbiddenException forbidden => Problem(StatusCodes.Status403Forbidden, "Forbidden", forbidden.Message, "forbidden"),
             DbUpdateConcurrencyException => Problem(StatusCodes.Status409Conflict, "Conflict",
                 "The resource was modified by another request. Reload it and try again.", "concurrency_conflict"),

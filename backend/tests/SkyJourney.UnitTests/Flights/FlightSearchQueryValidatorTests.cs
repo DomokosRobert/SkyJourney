@@ -37,7 +37,10 @@ public sealed class FlightSearchQueryValidatorTests
     {
         var result = _validator.Validate(new FlightSearchQuery
         {
-            Origin = "BUD", Destination = "LHR", DepartureDate = Date, ReturnDate = Date.AddDays(-1),
+            Origin = "BUD",
+            Destination = "LHR",
+            DepartureDate = Date,
+            ReturnDate = Date.AddDays(-1),
         });
 
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(FlightSearchQuery.ReturnDate));
@@ -60,7 +63,11 @@ public sealed class FlightSearchQueryValidatorTests
     {
         var result = _validator.Validate(new FlightSearchQuery
         {
-            Origin = "BUD", Destination = "LHR", DepartureDate = Date, Adults = adults, Children = children,
+            Origin = "BUD",
+            Destination = "LHR",
+            DepartureDate = Date,
+            Adults = adults,
+            Children = children,
         });
 
         Assert.False(result.IsValid);
@@ -71,7 +78,11 @@ public sealed class FlightSearchQueryValidatorTests
     {
         var result = _validator.Validate(new FlightSearchQuery
         {
-            Origin = "BUD", Destination = "LHR", DepartureDate = Date, Adults = 2, Children = 7,
+            Origin = "BUD",
+            Destination = "LHR",
+            DepartureDate = Date,
+            Adults = 2,
+            Children = 7,
         });
 
         Assert.True(result.IsValid);
@@ -105,7 +116,11 @@ public sealed class FlightSearchQueryValidatorTests
     {
         var result = _validator.Validate(new FlightSearchQuery
         {
-            Origin = "BUD", Destination = "LHR", DepartureDate = Date, DepartAfter = new TimeOnly(18, 0), DepartBefore = new TimeOnly(9, 0),
+            Origin = "BUD",
+            Destination = "LHR",
+            DepartureDate = Date,
+            DepartAfter = new TimeOnly(18, 0),
+            DepartBefore = new TimeOnly(9, 0),
         });
 
         Assert.False(result.IsValid);

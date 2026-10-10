@@ -55,6 +55,8 @@ public sealed class SkyJourneyApiFactory : WebApplicationFactory<Program>, IAsyn
         builder.UseSetting("Database:MigrateOnStartup", "true");
         builder.UseSetting("FlightData:SeedOnStartup", "true");
         builder.UseSetting("FlightData:HorizonDays", HorizonDays.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        // All in-memory requests share one client "IP"; RateLimitTests uses its own low limit.
+        builder.UseSetting("RateLimiting:AuthPermitLimit", "100000");
 
         builder.ConfigureServices(services =>
         {

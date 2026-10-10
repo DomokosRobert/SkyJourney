@@ -20,3 +20,9 @@ public sealed class UnprocessableException(string code, string message) : Except
 
 /// <summary>The caller is authenticated but not allowed to perform the operation (HTTP 403).</summary>
 public sealed class ForbiddenException(string message) : Exception(message);
+
+/// <summary>The caller could not be authenticated (HTTP 401).</summary>
+public sealed class UnauthorizedException(string code, string message) : Exception(message)
+{
+    public string Code { get; } = code;
+}

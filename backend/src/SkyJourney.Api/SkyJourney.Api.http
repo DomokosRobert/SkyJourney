@@ -21,3 +21,33 @@ GET {{baseUrl}}/api/v1/flights/search?origin=BUD&destination=CDG&departureDate={
 
 ### Lowest fare per day (calendar price hints)
 GET {{baseUrl}}/api/v1/flights/lowest-fares?origin=BUD&destination=LHR&from=2026-11-01&to=2026-11-30
+
+### Register (demo account; use any address you control or example.com)
+# @name register
+POST {{baseUrl}}/api/v1/auth/register
+Content-Type: application/json
+
+{ "email": "traveller@example.com", "password": "Correct-Horse-9", "firstName": "Ada", "lastName": "Lovelace" }
+
+### Login
+# @name login
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{ "email": "traveller@example.com", "password": "Correct-Horse-9" }
+
+### Profile (uses the access token from the login response)
+GET {{baseUrl}}/api/v1/me
+Authorization: Bearer {{login.response.body.accessToken}}
+
+### Refresh (each refresh token works once)
+POST {{baseUrl}}/api/v1/auth/refresh
+Content-Type: application/json
+
+{ "refreshToken": "{{login.response.body.refreshToken}}" }
+
+### Logout
+POST {{baseUrl}}/api/v1/auth/logout
+Content-Type: application/json
+
+{ "refreshToken": "{{login.response.body.refreshToken}}" }

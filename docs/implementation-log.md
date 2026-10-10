@@ -126,3 +126,28 @@ is filled in by the next commit (or listed in the final report).
     earlier returns; the booking API must enforce the same rule in M11.
   - The summary total is indicative only; the server computes the price when the booking is created (M11). The "continue to
     booking" action is added with the booking flow in M13.
+
+## M9 — `feat(auth): implement registration, login and token rotation`
+- **Previous commit:** M8 = `117af00`.
+- **Content:** ASP.NET Core Identity (`AddIdentityCore`, password policy: 10+ chars with upper case, lower case and a digit;
+  lockout after 5 failures for 15 min); HMAC-SHA256 JWT access tokens (15 min; `sub`, `email`, `role`, `jti`); opaque 256-bit
+  refresh tokens (30 days) stored as SHA-256 hashes in the new `refresh_tokens` table (migration `AddRefreshTokens`), rotated
+  on every use with family-wide revocation on reuse and an atomic claim so concurrent refreshes cannot both win; endpoints
+  `POST /api/v1/auth/{register,login,refresh,logout}` and `GET/PUT /api/v1/me`; `Admin` authorization policy; `ICurrentUser`;
+  per-IP fixed-window rate limiting on `/auth` (`429 rate_limited` + `Retry-After`); configurable CORS (off by default);
+  `promote-admin` CLI command; bearer scheme in OpenAPI; default `code` values for framework-generated 401/403/404/405.
+- **Validation:** ✅ `dotnet build` (0 warnings); ✅ `dotnet format --verify-no-changes`; ✅ `dotnet test` 139/139
+  (unit: validators, signing-key rules, refresh-token secrets, access-token claims; integration: registration, duplicate
+  e-mail, password composition, login, identical failure responses, lockout, rotation, reuse detection, concurrent refresh,
+  logout, hash-only storage, 401 problem responses, profile update, token expiry with a dedicated clock, admin promotion,
+  rate limiting). A deliberately broken assertion in the concurrency test failed as expected and was reverted. Manually
+  against the dev database: migration applied on startup, register → `/me` round trip, `promote-admin` exit codes 0/1.
+- **Decisions:**
+  - Without `Jwt:SigningKey`, Development/Testing use a random per-process key (warning logged). Every other environment
+    refuses to start. No key is committed anywhere.
+  - JWT lifetime is validated against the injected `TimeProvider`, so expiry is testable without real waiting.
+  - Strict reuse detection: two racing refreshes with one token end the session; the mobile client must refresh single-flight (M10).
+- **Housekeeping:** `dotnet format --verify-no-changes` had not been part of earlier checks and failed on existing code:
+  `.editorconfig` demanded a `_` prefix for `private static readonly` and `const` fields, which the codebase consistently
+  names in PascalCase. Added explicit PascalCase rules for those, and applied the formatter's whitespace/import-order fixes
+  to two M6 test files. The format check is part of every milestone from now on.

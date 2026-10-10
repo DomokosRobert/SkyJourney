@@ -1,8 +1,8 @@
 using System.Net;
+using Microsoft.Extensions.DependencyInjection;
 using SkyJourney.Application.Common;
 using SkyJourney.Application.FlightData;
 using SkyJourney.IntegrationTests.Infrastructure;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace SkyJourney.IntegrationTests.Flights;
 
