@@ -459,3 +459,15 @@ is filled in by the next commit (or listed in the final report).
 - **Deviation from the plan:** the plan listed Maestro flows. Maestro and the Java it needs are not installed, and
   installing system software was not part of the agreed scope. Flows that were never run would be misleading
   placeholders, so none were written. Mobile UI E2E remains a known gap; see `docs/testing.md`.
+
+## Fix — `fix(mobile): keep Expo Go as the default development target`
+- **Previous commit:** M20 = `aff07b2`.
+- **Found while writing the README (M21):** M18 installed `expo-dev-client`. Once that package is present, `expo start`
+  targets a custom development build instead of Expo Go. None exists yet (it needs `eas build` or a local native
+  build), so `npm run ios` would have stopped opening the app in Expo Go.
+- **Change:** `start`, `ios` and `android` now pass `--go`. A new `start:dev-client` script serves an installed
+  development build.
+- **Validation:**
+  - ✅ `expo start --go` starts Metro.
+  - ✅ The flag forces Expo Go mode. Checked in `@expo/cli`'s `resolveOptions`: `--go` overrides the automatic
+    dev-client detection.

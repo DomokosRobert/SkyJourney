@@ -38,9 +38,10 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "start": "expo start",
-    "ios": "expo start --ios",
-    "android": "expo start --android",
+    "start": "expo start --go",
+    "ios": "expo start --go --ios",
+    "android": "expo start --go --android",
+    "start:dev-client": "expo start --dev-client",
     "web": "expo start --web",
     "typegen": "expo customize tsconfig.json",
     "typecheck": "npm run typegen --silent && tsc --noEmit",
