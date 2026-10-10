@@ -6,5 +6,7 @@ export { DemoDataNotice } from './DemoDataNotice';
 export { OfflineBanner } from './OfflineBanner';
 export { Screen } from './Screen';
 export { Stepper } from './Stepper';
+export { FormMessage } from './FormMessage';
+export { FormTextField } from './FormTextField';
 export { EmptyState, ErrorState, LoadingState, describeError } from './StateViews';
 export { TextField } from './TextField';

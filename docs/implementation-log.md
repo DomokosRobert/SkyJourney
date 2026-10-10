@@ -151,3 +151,29 @@ is filled in by the next commit (or listed in the final report).
   `.editorconfig` demanded a `_` prefix for `private static readonly` and `const` fields, which the codebase consistently
   names in PascalCase. Added explicit PascalCase rules for those, and applied the formatter's whitespace/import-order fixes
   to two M6 test files. The format check is part of every milestone from now on.
+
+## M10 — `feat(mobile): add authentication screens and secure token storage`
+- **Previous commit:** M9 = `13e5b1b`.
+- **Content:** typed auth API client (`src/api/auth.ts`); `expo-secure-store` storage for the refresh token and cached
+  profile (Keychain `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY`); framework-agnostic session manager (`src/auth/session.ts`) with
+  in-memory access token, single-flight refresh, a generation guard so a refresh finishing after sign-out is ignored, and
+  offline-tolerant restore; `AuthProvider` (installs the API client's auth hooks, exposes state via `useSyncExternalStore`,
+  drops user-scoped queries on sign-out); login and registration modals (react-hook-form + zod rules mirroring the API,
+  server field errors mapped onto fields, friendly messages for `invalid_credentials`, `account_locked`, `email_taken`,
+  `rate_limited`); signed-in/signed-out profile tab; reusable `FormTextField` and `FormMessage`; `Screen` now avoids the
+  keyboard on iOS so footer actions stay visible.
+- **Validation:** ✅ `npm run typecheck`; ✅ `npm run lint`; ✅ `npm test` 68/68 (session manager: restore, rotation,
+  single-flight, transient vs. rejected refresh, sign-out races; secure storage; schemas and error mapping; login screen);
+  ✅ `npx expo-doctor` 21/21; ✅ `npx expo export --platform ios`. Making refreshes non-shared made the single-flight test
+  fail, as intended (reverted). A throwaway jest script (not committed; jest-expo stubs `fetch`, so it used a `node:http`
+  shim) ran the real session manager against the local API: register → `/me` → restore with rotation → `PUT /me` → reuse
+  of the rotated token revokes the family and the client signs out → wrong password gives `invalid_credentials`. On the
+  iPhone 17 Pro simulator the signed-out profile tab and the login modal render; typing into the forms on the simulator
+  was not automated (no UI driver installed).
+- **Decisions:**
+  - Only the refresh token and the last profile are persisted. The access token lives in memory, so a cold start always
+    refreshes once.
+  - A refresh rejected with 400/401 ends the session; network errors, 5xx and 429 keep it (the cached profile keeps the
+    UI signed in offline, and the next request retries).
+  - The `expo-secure-store` config plugin is not added: it only configures Face ID usage text, which the app doesn't use.
+  - `npm run typecheck` now regenerates typed routes first (see `docs/testing.md`), which CI needs too.

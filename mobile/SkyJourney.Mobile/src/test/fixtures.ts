@@ -1,3 +1,4 @@
+import type { AuthResponse, UserProfile } from '@/api/auth';
 import type { Airport, FlightOffer } from '@/api/types';
 
 export const BUD: Airport = { iataCode: 'BUD', name: 'Budapest Ferenc Liszt International', city: 'Budapest', countryCode: 'HU', timeZoneId: 'Europe/Budapest' };
@@ -30,5 +31,25 @@ export function offer(overrides: Partial<FlightOffer> & { dep?: string; arr?: st
         ? []
         : [{ family: 'Basic', pricePerPassenger: { amount: price, currency: 'EUR' }, totalPrice: { amount: price, currency: 'EUR' }, conditions }],
     ...rest,
+  };
+}
+
+export const TRAVELLER: UserProfile = {
+  id: '0199a1b2-0000-7000-8000-000000000001',
+  email: 'ada@example.com',
+  firstName: 'Ada',
+  lastName: 'Lovelace',
+  roles: [],
+  createdAt: '2026-10-01T10:00:00+00:00',
+};
+
+/** An AuthResponse whose tokens carry a sequence number, so rotations are distinguishable. */
+export function authResponse(n: number, user: UserProfile = TRAVELLER): AuthResponse {
+  return {
+    accessToken: `access-${n}`,
+    accessTokenExpiresAt: '2026-10-10T12:15:00+00:00',
+    refreshToken: `refresh-${n}`,
+    refreshTokenExpiresAt: '2026-11-09T12:00:00+00:00',
+    user,
   };
 }
