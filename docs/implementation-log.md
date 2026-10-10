@@ -471,3 +471,23 @@ is filled in by the next commit (or listed in the final report).
   - ✅ `expo start --go` starts Metro.
   - ✅ The flag forces Expo Go mode. Checked in `@expo/cli`'s `resolveOptions`: `--go` overrides the automatic
     dev-client detection.
+
+## M21 — `docs: add README, learning guide and final verification`
+- **Previous commit:** Fix = `549fa24` (after M20 = `aff07b2`).
+- **What it adds:**
+  - **`README.md`:** features, repository layout, local setup, iPhone instructions, checks, a documentation index, and
+    status.
+  - **`docs/learning-guide.md`:** the concepts behind the code, with pointers to source files, practice ideas, and
+    known limitations.
+- **Final verification (this commit's tree):**
+  - Backend:
+    - ✅ `dotnet build`: 0 warnings, 0 errors.
+    - ✅ `dotnet format --verify-no-changes`.
+    - ✅ `dotnet test`: 208/208 (unit and integration, including concurrency and end-to-end).
+    - ✅ `has-pending-model-changes`: none.
+  - Mobile:
+    - ✅ typecheck, ✅ lint, ✅ Jest 109/109 (23 suites), ✅ expo-doctor 21/21.
+  - ✅ The smoke script passed against the dev API (M20).
+  - ✅ The README's `promote-admin` command, run through the launch profile, exits 1 for an unknown e-mail. No data was
+    changed.
+  - ⚠️ Not run: GitHub Actions, EAS builds, store submissions, cloud deployment. See the README "Status" section.
