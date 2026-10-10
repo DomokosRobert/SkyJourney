@@ -106,3 +106,23 @@ is filled in by the next commit (or listed in the final report).
 - **Validation:** ✅ `dotnet build` (0 warnings); ✅ `dotnet test` 106/106. Manually: request log lines carry the caller's
   correlation id and record final status codes. A real mid-request client abort could not be reproduced locally (responses take
   ~1 ms); the 499 path is covered by the level-mapping test only.
+
+## M8 — `feat(mobile): implement flight search experience`
+- **Previous commit:** M7 = `1a6e518` (followed by fix `8cb74cf`).
+- **Content:** typed wire models and TanStack Query hooks for airports, destinations, search, lowest fares and flight details;
+  search form (one-way/return, swap, passenger steppers, zod validation); airport picker modal with debounced search and
+  "destinations from origin" when the query is empty; price calendar modal (lowest fare per day, cheapest day highlighted,
+  days without flights disabled, return calendar uses the reverse route); results screen with previous/next day, sorting,
+  departure-time and price filters, pull-to-refresh and loading/empty/error/offline states; flight details with fare families
+  and their conditions; return-leg selection; trip summary with an indicative total. Booking-draft React context holds the
+  criteria and selected fares.
+- **Validation:** ✅ `npm run typecheck`; ✅ `npm run lint`; ✅ `npm test` 38/38 (criteria validation, sort/filter, minimum stay,
+  calendar grid, FlightCard); ✅ `npx expo export --platform ios`. On the iPhone 17 Pro simulator (Expo Go): search home and
+  airport picker render and load data from the local API. The full flow through results → details → summary was not
+  screenshot-verified end to end.
+- **Decisions:**
+  - Sorting and filtering are client-side over the day's results (at most a few dozen flights per route per day).
+  - A return flight must depart at least 120 minutes after the outbound lands (`MIN_STAY_MINUTES`). The UI disables
+    earlier returns; the booking API must enforce the same rule in M11.
+  - The summary total is indicative only; the server computes the price when the booking is created (M11). The "continue to
+    booking" action is added with the booking flow in M13.

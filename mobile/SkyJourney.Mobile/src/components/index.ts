@@ -1,7 +1,10 @@
 export { AppText } from './AppText';
 export { Button } from './Button';
 export { Card } from './Card';
+export { Chip } from './Chip';
+export { DemoDataNotice } from './DemoDataNotice';
 export { OfflineBanner } from './OfflineBanner';
 export { Screen } from './Screen';
+export { Stepper } from './Stepper';
 export { EmptyState, ErrorState, LoadingState, describeError } from './StateViews';
 export { TextField } from './TextField';
