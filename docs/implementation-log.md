@@ -390,3 +390,34 @@ is filled in by the next commit (or listed in the final report).
     bands, and the newer patch matches the 10.0.x package versions.
   - Docker images are built, never pushed. Publishing to a registry needs credentials and a decision from the owner
     (see `docs/deployment.md`).
+
+## M18 — `build(mobile): add EAS build profiles with placeholder identifiers`
+- **Previous commit:** M17 = `d64f001`.
+- **What it adds:**
+  - **`eas.json`:**
+    - `development` (dev client, iOS simulator), `development-device`, `preview` (internal distribution, Android
+      APK) and `production` (store builds, auto-incremented build numbers, `appVersionSource: remote`).
+    - The `EXPO_PUBLIC_API_URL` values are placeholders: `https://api-staging.example.com` and
+      `https://api.example.com`.
+    - The `submit.production` block uses placeholders `<APP_STORE_CONNECT_APP_ID>` and `<APPLE_TEAM_ID>`. Google Play
+      uses the `internal` track, as a draft.
+  - **`app.config.ts`:**
+    - Layered over `app.json`. Identifiers come from `APP_IOS_BUNDLE_ID` and `APP_ANDROID_PACKAGE`, falling back to
+      the placeholder `com.example.skyjourney`.
+    - Non-production variants get a `.development` or `.preview` suffix and a labelled name, so they install next to
+      the store build.
+    - `EAS_PROJECT_ID` and `EXPO_OWNER` are read when set.
+  - **`expo-dev-client` 57.0.19:** installed with `npx expo install`; published 2026-09-11.
+  - **`.gitignore`:** `/secrets/` keeps the Play service-account key out of Git.
+- **Validation:**
+  - ✅ `npx expo config` resolves the development variant (`com.example.skyjourney.development`) and the production
+    variant with an overridden bundle id.
+  - ✅ typecheck, ✅ lint, ✅ Jest 109/109, ✅ expo-doctor 21/21, ✅ `expo export` for iOS and Android.
+  - ⚠️ Not done: no EAS build or submit has been run. That needs an Expo account (`eas login` / `eas init`), an Apple
+    Developer membership and a Google Play Console account. None of these credentials were available, and none were
+    invented.
+- **Decisions:**
+  - Account-specific values are environment variables or explicit `<PLACEHOLDER>`s, never guessed values. The
+    `example.com` identifiers cannot be submitted to either store, by design.
+  - `usesNonExemptEncryption: false` is set because the app only uses OS-provided TLS. The owner must confirm this
+    export-compliance answer for their own submission.

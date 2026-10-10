@@ -39,3 +39,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Store credentials (e.g. the Google Play service account key used by eas submit)
+/secrets/
